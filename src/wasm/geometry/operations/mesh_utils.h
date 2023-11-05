@@ -521,10 +521,10 @@ namespace webifc::geometry
 		}
 	}
 
-	inline double InverseMethod(glm::dvec3 pt, tinynurbs::RationalSurface3d srf, double pr, double rotations, double minError, double maxError,
+	inline double InverseMethod1(glm::dvec3 pt, tinynurbs::RationalSurface3d srf, double pr, double rotations, double minError, double maxError,
 		double& fU, double& fV, double& divisor, double maxDistance)
 	{
-		spdlog::debug("[InverseMethod({})]");
+		spdlog::debug("[InverseMethod1({})]");
 		while (maxDistance > maxError && divisor < 10000)
 		{
 			for (double r = 1; r < 5; r++)
@@ -572,6 +572,57 @@ namespace webifc::geometry
 		return maxDistance;
 	}
 
+	inline double InverseMethod2(glm::dvec3 pt, tinynurbs::RationalSurface3d srf, double pr, double rotations, double minError, double maxError,
+		double& fU, double& fV, double& divisor, double maxDistance, double limit)
+	{
+		spdlog::debug("[InverseMethod2({})]");
+		while (maxDistance > maxError && divisor < 10000)
+		{
+			for (double r = 1; r < 5; r++)
+			{
+				int round = 0;
+				while (maxDistance > minError && round < 3)
+				{
+					for (double i = 0; i < rotations; i++)
+					{
+						double rads = (i / rotations) * CONST_PI * 2;
+						double incU = glm::sin(rads) / (r * r * divisor);
+						double incV = glm::cos(rads) / (r * r * divisor);
+						if (pr > 1)
+						{
+							incV *= pr;
+						}
+						else
+						{
+							incU /= pr;
+						}
+						bool repeat = true;
+						double displacementU = 0;
+						double displacementV = 0;
+						while (glm::abs(displacementU) < limit && glm::abs(displacementV) < limit)
+						{
+							displacementU += incU;
+							displacementV += incV;
+							double ffU = fU + incU;
+							double ffV = fV + incV;
+							glm::highp_dvec3 pt00 = tinynurbs::surfacePoint(srf, ffU, ffV);
+							double di = glm::distance(pt00, pt);
+							if (di < maxDistance)
+							{
+								maxDistance = di;
+								fU = ffU;
+								fV = ffV;
+							}
+						}
+					}
+					round++;
+				}
+			}
+			divisor *= 3;
+		}
+		return maxDistance;
+	}
+
 	inline glm::dvec2 BSplineInverseEvaluation(glm::dvec3 pt, tinynurbs::RationalSurface3d srf, double scaling)
 	{
 		spdlog::debug("[BSplineInverseEvaluation({})]");
@@ -583,8 +634,8 @@ namespace webifc::geometry
 		double dv = glm::distance(ptc, ptv);
 		double pr = (dh + 1) / (dv + 1);
 
-		double minError = 0.0001;
-		double maxError = 0.01;
+		double minError = 0.00001 / scaling;
+		double maxError = 0.001 / scaling;
 		double rotations = 6;
 
 		double fU = 0.5;
@@ -592,7 +643,18 @@ namespace webifc::geometry
 		double divisor = 100.0;
 		double maxDistance = 1e+100;
 
-		maxDistance = InverseMethod(pt, srf, pr, rotations, minError / scaling, maxError / scaling, fU, fV, divisor, maxDistance);
+		maxDistance = InverseMethod1(pt, srf, pr, rotations, minError, maxError, fU, fV, divisor, maxDistance);
+
+		while(maxDistance > maxError)
+		{
+			rotations = 12;
+			fU = 0.5;
+		 	fV = 0.5;
+		 	divisor = 10.0;
+		 	maxDistance = 1e+100;
+			maxDistance = InverseMethod2(pt, srf, pr, rotations, minError, maxError, fU, fV, divisor, maxDistance, 10);
+		}
+
 		return glm::dvec2(fU, fV);
 	}
 

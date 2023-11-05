@@ -276,7 +276,9 @@ int main()
     // Benchmark();
 
     // return 0;
-    std::string content = ReadFile("C:/Users/qmoya/Desktop/PROGRAMES/VSCODE/IFC.JS/issues/#512/512.ifc");
+
+    // std::string content = ReadFile("C:/Users/qmoya/Desktop/PROGRAMES/VSCODE/IFC.JS/issues/#512/512.ifc");
+    std::string content = ReadFile("C:/Users/qmoya/Desktop/PROGRAMES/VSCODE/IFC.JS/issues/#520/520B.ifc");
 
     struct LoaderSettings
     {
@@ -317,8 +319,11 @@ int main()
     start = ms();
 
     // SpecificLoadTest(loader, geometryLoader, 17517); //512
-    SpecificLoadTest(loader, geometryLoader, 7390); //512
+    // SpecificLoadTest(loader, geometryLoader, 7390); //512
     // SpecificLoadTest(loader, geometryLoader, 7260); //512
+    // SpecificLoadTest(loader, geometryLoader, 181); //520A
+    SpecificLoadTest(loader, geometryLoader, 213); //520B
+
 
     // auto meshes = LoadAllTest(loader, geometryLoader);
     // auto alignments = GetAlignments(loader, geometryLoader);
