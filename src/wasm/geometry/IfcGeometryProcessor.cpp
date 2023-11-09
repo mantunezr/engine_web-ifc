@@ -1230,6 +1230,8 @@ namespace webifc::geometry
             surface.BSplineSurface.VMultiplicity = VMultiplicity;
             surface.BSplineSurface.UKnots = UKnots;
             surface.BSplineSurface.VKnots = VKnots;
+            surface.BSplineSurface.ClosedU = closedU;
+            surface.BSplineSurface.ClosedV = closedV;
 
             return surface;
 
