@@ -14,6 +14,13 @@
 #include "geometryutils.h"
 #include <glm/glm.hpp>
 
+
+// MANUEL ANTÚNEZ DEBUG <<DELETE>>
+#include <utils/exports/svg/svg.hpp>
+
+
+
+
 #define CONST_PI 3.141592653589793238462643383279502884L
 
 namespace webifc::geometry
@@ -610,14 +617,37 @@ namespace webifc::geometry
 		size_t num_v = surface.BSplineSurface.ControlPoints[0].size();
 
 		std::vector<glm::dvec3> controlPoints;
+		size_t index_delete{0};
 		for (std::vector<glm::dvec3> row : surface.BSplineSurface.ControlPoints)
 		{
 			for (glm::dvec3 point : row)
 			{
 				controlPoints.push_back({point.x, point.y, point.z});
 			}
+				// TODO: MANUEL ANTÚNEZ DEBUG <<DELETE>>
+				// points
+				{
+					utils::exports::svg::line2s_t<double> lines;
+					lines.reserve(row.size());
+					for(size_t i {1}; i < row.size(); ++i){
+						auto const i1{i-1};
+						auto const i2{i-0};
+						auto const& p1{row[i1]};
+						auto const& p2{row[i2]};
+						auto& line {lines.emplace_back()};
+						line.emplace_back(glm::dvec2{p1[0], p1[1]});
+						line.emplace_back(glm::dvec2{p2[0], p2[1]});
+					}
+					utils::exports::svg::svg_file<double> svg{L"exports/svgs/row_bspline"+ std::to_wstring(index_delete) + L".svg",lines};
+					svg.write_svg_file();
+				}
+			++index_delete;
 		}
+
+
+
 		srf.control_points = tinynurbs::array2(num_u, num_v, controlPoints);
+
 
 		std::vector<double> weights;
 		for (std::vector<double> row : surface.BSplineSurface.Weights)
@@ -656,49 +686,89 @@ namespace webifc::geometry
 
 		if (tinynurbs::surfaceIsValid(srf))
 		{
+			size_t num_points{bounds[0].curve.points.size()};
 
-				// Find projected boundary using NURBS inverse evaluation
+			// Find projected boundary using NURBS inverse evaluation
 
 			using Point = std::array<double, 2>;
-			std::vector<std::vector<Point>> uvBoundaryValues;
+			using points_t = std::vector<Point>;
+			points_t points;
+			points.reserve(num_points);
 
-			std::vector<Point> points;
-			for (size_t j = 0; j < bounds[0].curve.points.size(); j++)
+			for (size_t j = 0; j < num_points; j++)
 			{
 				glm::dvec3 pt = bounds[0].curve.points[j];
 				glm::dvec2 pInv = BSplineInverseEvaluation(pt, srf, scaling);
-				points.push_back({pInv.x, pInv.y});
+				points.emplace_back(Point{pInv.x, pInv.y});
 			}
-			uvBoundaryValues.push_back(points);
+			// Triangulate projected boundary
+			// Subdivide resulting triangles to increase definition
+			// r indicates the level of subdivision, currently 3 you can increase it to 5
+			std::vector<uint32_t> indices = mapbox::earcut<uint32_t>(std::vector<points_t>{points});
 
-				// Triangulate projected boundary
-				// Subdivide resulting triangles to increase definition
-				// r indicates the level of subdivision, currently 3 you can increase it to 5
 
-			std::vector<uint32_t> indices = mapbox::earcut<uint32_t>(uvBoundaryValues);
+			// TODO: MANUEL ANTÚNEZ DEBUG <<DELETE>>
+			// points
+			{
+				utils::exports::svg::line2s_t<double> lines;
+				lines.reserve(points.size());
+				for(size_t i {1}; i < points.size(); ++i){
+					auto const i1{i-1};
+					auto const i2{i-0};
+					auto const& p1{points[i1]};
+					auto const& p2{points[i2]};
+					auto& line {lines.emplace_back()};
+					line.emplace_back(glm::dvec2{p1[0], p1[1]});
+					line.emplace_back(glm::dvec2{p2[0], p2[1]});
+				}
+				utils::exports::svg::svg_file<double> svg{L"exports/svgs/points_bspline.svg",lines};
+				svg.write_svg_file();
+			}
+
+			// TODO: MANUEL ANTÚNEZ DEBUG <<DELETE>>
+			// triangles points
+			{
+				utils::exports::svg::line2s_t<double> lines;
+				lines.reserve(indices.size());
+				for(size_t i {2}; i < indices.size(); i+=3){
+					auto const i1{i-2};
+					auto const i2{i-1};
+					auto const i3{i-0};
+					auto const& index1{indices[i1]};
+					auto const& index2{indices[i2]};
+					auto const& index3{indices[i3]};
+					auto const& p1{points[index1]};
+					auto const& p2{points[index2]};
+					auto const& p3{points[index3]};
+
+					auto& line {lines.emplace_back()};
+					line.emplace_back(glm::dvec2{p1[0], p1[1]});
+					line.emplace_back(glm::dvec2{p2[0], p2[1]});
+					line.emplace_back(glm::dvec2{p3[0], p3[1]});
+					line.emplace_back(glm::dvec2{p1[0], p1[1]});
+				}
+				utils::exports::svg::svg_file<double> svg{L"exports/svgs/bspline.svg",lines};
+				svg.write_svg_file();
+			}
+
+
 
 			for (size_t r = 0; r < 3; r++)
 			{
+				auto num_indices{indices.size()};
 				std::vector<uint32_t> newIndices;
-				std::vector<Point> newUVPoints;
+				newIndices.reserve(num_indices / 3 * 12);
+				points_t newUVPoints;
+				newUVPoints.reserve(num_indices / 3 * 6);
 
-				for (size_t i = 0; i < indices.size(); i += 3)
+				for (size_t i = 0; i < num_indices; i += 3)
 				{
-					Point p0 = uvBoundaryValues[0][indices[i + 0]];
-					Point p1 = uvBoundaryValues[0][indices[i + 1]];
-					Point p2 = uvBoundaryValues[0][indices[i + 2]];
-
-					newUVPoints.push_back(p0);
-					newUVPoints.push_back(p1);
-					newUVPoints.push_back(p2);
-
-					Point p3 = {(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2};
-					Point p4 = {(p0[0] + p2[0]) / 2, (p0[1] + p2[1]) / 2};
-					Point p5 = {(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2};
-
-					newUVPoints.push_back(p3);
-					newUVPoints.push_back(p4);
-					newUVPoints.push_back(p5);
+					auto const& p0 = newUVPoints.emplace_back(std::move(points[indices[i + 0]]));
+					auto const& p1 = newUVPoints.emplace_back(std::move(points[indices[i + 1]]));
+					auto const& p2 = newUVPoints.emplace_back(std::move(points[indices[i + 2]]));
+					newUVPoints.emplace_back(Point{(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2});
+					newUVPoints.emplace_back(Point{(p0[0] + p2[0]) / 2, (p0[1] + p2[1]) / 2});
+					newUVPoints.emplace_back(Point{(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2});
 
 					int offset = newUVPoints.size() - 6;
 
@@ -719,15 +789,15 @@ namespace webifc::geometry
 					newIndices.push_back(offset + 2);
 				}
 
-				uvBoundaryValues[0] = newUVPoints;
+				points = newUVPoints;
 				indices = newIndices;
 			}
 
 			for (size_t i = 0; i < indices.size(); i += 3)
 			{
-				Point p0 = uvBoundaryValues[0][indices[i + 0]];
-				Point p1 = uvBoundaryValues[0][indices[i + 1]];
-				Point p2 = uvBoundaryValues[0][indices[i + 2]];
+				auto const& p0 = points[indices[i + 0]];
+				auto const& p1 = points[indices[i + 1]];
+				auto const& p2 = points[indices[i + 2]];
 				glm::dvec3 pt00 = tinynurbs::surfacePoint(srf, p0[0], p0[1]);
 				glm::dvec3 pt01 = tinynurbs::surfacePoint(srf, p1[0], p1[1]);
 				glm::dvec3 pt10 = tinynurbs::surfacePoint(srf, p2[0], p2[1]);

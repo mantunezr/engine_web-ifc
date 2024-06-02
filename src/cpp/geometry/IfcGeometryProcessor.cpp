@@ -125,6 +125,9 @@ namespace webifc::geometry
                 }
             }
         }
+        if(expressID == 612){
+            auto a{2};
+        }
 
         IfcComposedMesh mesh;
         mesh.expressID = expressID;
