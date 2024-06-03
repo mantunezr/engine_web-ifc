@@ -16,7 +16,7 @@
 
 
 // MANUEL ANTÚNEZ DEBUG <<DELETE>>
-#include <utils/exports/svg/svg.hpp>
+#include <utils/exports/obj/obj.hpp>
 
 
 
@@ -618,32 +618,30 @@ namespace webifc::geometry
 
 		std::vector<glm::dvec3> controlPoints;
 		size_t index_delete{0};
+	
+		// TODO: MANUEL ANTÚNEZ DEBUG <<DELETE>>
+		utils::exports::obj::data_obj obj_data{};
+		obj_data.lengths_axis = vector_t{400.0, 300.0, 200.0}; 
+		obj_data.vertices.reserve(surface.BSplineSurface.UKnots.size() * surface.BSplineSurface.VKnots.size());
+		obj_data.material_file = "materials";	
+		size_t index_obj_color{0};
 		for (std::vector<glm::dvec3> row : surface.BSplineSurface.ControlPoints)
 		{
+			auto& line {obj_data.lines.emplace_back()};
+			line.material = index_obj_color++;
 			for (glm::dvec3 point : row)
 			{
+				// TODO: MANUEL ANTÚNEZ DEBUG <<DELETE>>
+				{
+					obj_data.vertices.emplace_back(static_cast<float>(point.x), static_cast<float>(point.y), static_cast<float>(point.z));
+					line.indexes.push_back(obj_data.vertices.size());
+				}
+				
 				controlPoints.push_back({point.x, point.y, point.z});
 			}
-				// TODO: MANUEL ANTÚNEZ DEBUG <<DELETE>>
-				// points
-				{
-					utils::exports::svg::line2s_t<double> lines;
-					lines.reserve(row.size());
-					for(size_t i {1}; i < row.size(); ++i){
-						auto const i1{i-1};
-						auto const i2{i-0};
-						auto const& p1{row[i1]};
-						auto const& p2{row[i2]};
-						auto& line {lines.emplace_back()};
-						line.emplace_back(glm::dvec2{p1[0], p1[1]});
-						line.emplace_back(glm::dvec2{p2[0], p2[1]});
-					}
-					utils::exports::svg::svg_file<double> svg{L"exports/svgs/row_bspline"+ std::to_wstring(index_delete) + L".svg",lines};
-					svg.write_svg_file();
-				}
 			++index_delete;
 		}
-
+		utils::exports::obj::write_obj(L"exports/objs/TriangulateBSpline.obj", obj_data);
 
 
 		srf.control_points = tinynurbs::array2(num_u, num_v, controlPoints);
@@ -705,53 +703,6 @@ namespace webifc::geometry
 			// Subdivide resulting triangles to increase definition
 			// r indicates the level of subdivision, currently 3 you can increase it to 5
 			std::vector<uint32_t> indices = mapbox::earcut<uint32_t>(std::vector<points_t>{points});
-
-
-			// TODO: MANUEL ANTÚNEZ DEBUG <<DELETE>>
-			// points
-			{
-				utils::exports::svg::line2s_t<double> lines;
-				lines.reserve(points.size());
-				for(size_t i {1}; i < points.size(); ++i){
-					auto const i1{i-1};
-					auto const i2{i-0};
-					auto const& p1{points[i1]};
-					auto const& p2{points[i2]};
-					auto& line {lines.emplace_back()};
-					line.emplace_back(glm::dvec2{p1[0], p1[1]});
-					line.emplace_back(glm::dvec2{p2[0], p2[1]});
-				}
-				utils::exports::svg::svg_file<double> svg{L"exports/svgs/points_bspline.svg",lines};
-				svg.write_svg_file();
-			}
-
-			// TODO: MANUEL ANTÚNEZ DEBUG <<DELETE>>
-			// triangles points
-			{
-				utils::exports::svg::line2s_t<double> lines;
-				lines.reserve(indices.size());
-				for(size_t i {2}; i < indices.size(); i+=3){
-					auto const i1{i-2};
-					auto const i2{i-1};
-					auto const i3{i-0};
-					auto const& index1{indices[i1]};
-					auto const& index2{indices[i2]};
-					auto const& index3{indices[i3]};
-					auto const& p1{points[index1]};
-					auto const& p2{points[index2]};
-					auto const& p3{points[index3]};
-
-					auto& line {lines.emplace_back()};
-					line.emplace_back(glm::dvec2{p1[0], p1[1]});
-					line.emplace_back(glm::dvec2{p2[0], p2[1]});
-					line.emplace_back(glm::dvec2{p3[0], p3[1]});
-					line.emplace_back(glm::dvec2{p1[0], p1[1]});
-				}
-				utils::exports::svg::svg_file<double> svg{L"exports/svgs/bspline.svg",lines};
-				svg.write_svg_file();
-			}
-
-
 
 			for (size_t r = 0; r < 3; r++)
 			{
