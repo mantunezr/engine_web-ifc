@@ -618,35 +618,15 @@ namespace webifc::geometry
 
 		std::vector<glm::dvec3> controlPoints;
 		size_t index_delete{0};
-	
-		// TODO: MANUEL ANTÚNEZ DEBUG <<DELETE>>
-		utils::exports::obj::data_obj obj_data{};
-		obj_data.lengths_axis = vector_t{400.0, 300.0, 200.0}; 
-		obj_data.vertices.reserve(surface.BSplineSurface.UKnots.size() * surface.BSplineSurface.VKnots.size());
-		obj_data.material_file = "materials";	
-		size_t index_obj_color{0};
 		for (std::vector<glm::dvec3> row : surface.BSplineSurface.ControlPoints)
 		{
-			auto& line {obj_data.lines.emplace_back()};
-			line.material = index_obj_color++;
 			for (glm::dvec3 point : row)
 			{
-				// TODO: MANUEL ANTÚNEZ DEBUG <<DELETE>>
-				{
-					obj_data.vertices.emplace_back(static_cast<float>(point.x), static_cast<float>(point.y), static_cast<float>(point.z));
-					line.indexes.push_back(obj_data.vertices.size());
-				}
-				
 				controlPoints.push_back({point.x, point.y, point.z});
 			}
 			++index_delete;
 		}
-		utils::exports::obj::write_obj(L"exports/objs/TriangulateBSpline.obj", obj_data);
-
-
 		srf.control_points = tinynurbs::array2(num_u, num_v, controlPoints);
-
-
 		std::vector<double> weights;
 		for (std::vector<double> row : surface.BSplineSurface.Weights)
 		{
@@ -664,6 +644,9 @@ namespace webifc::geometry
 		}
 		srf.weights = tinynurbs::array2(num_u, num_v, weights);
 
+
+// https://github.com/IfcOpenShell/IfcOpenShell/blob/v0.7.0/src/ifcgeom/IfcBSplineSurfaceWithKnots.cpp
+
 		for (size_t i = 0; i < surface.BSplineSurface.UMultiplicity.size(); i++)
 		{
 			for (size_t r = 0; r < surface.BSplineSurface.UMultiplicity[i]; r++)
@@ -680,7 +663,11 @@ namespace webifc::geometry
 			}
 		}
 
-			// If the NURBS surface is valid we continue
+
+
+
+
+		// If the NURBS surface is valid we continue
 
 		if (tinynurbs::surfaceIsValid(srf))
 		{
@@ -693,12 +680,28 @@ namespace webifc::geometry
 			points_t points;
 			points.reserve(num_points);
 
+			// TODO: MANUEL ANTÚNEZ DEBUG <<DELETE>>
+			utils::exports::obj::data_obj obj_data{};
+			obj_data.lengths_axis = vector_t{1.0, 1.0, 1.0}; 
+			obj_data.vertices.reserve(num_points);
+			obj_data.material_file = "materials";	
+			auto& line {obj_data.lines.emplace_back()};
+			size_t index_obj_color{0};
+
 			for (size_t j = 0; j < num_points; j++)
 			{
 				glm::dvec3 pt = bounds[0].curve.points[j];
 				glm::dvec2 pInv = BSplineInverseEvaluation(pt, srf, scaling);
 				points.emplace_back(Point{pInv.x, pInv.y});
+
+			// TODO: MANUEL ANTÚNEZ DEBUG <<DELETE>>
+				obj_data.vertices.emplace_back(pInv.x, pInv.y, 0.0);
+				line.indexes.push_back(obj_data.vertices.size());
 			}
+
+			// TODO: MANUEL ANTÚNEZ DEBUG <<DELETE>>
+			utils::exports::obj::write_obj(L"exports/objs/lineBSpline.obj", obj_data);
+
 			// Triangulate projected boundary
 			// Subdivide resulting triangles to increase definition
 			// r indicates the level of subdivision, currently 3 you can increase it to 5
