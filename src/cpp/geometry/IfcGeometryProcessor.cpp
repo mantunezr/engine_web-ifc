@@ -991,8 +991,6 @@ namespace webifc::geometry
             surface.BSplineSurface.VDegree = Vdegree;
             surface.BSplineSurface.ControlPoints = ctrolPts;
             surface.BSplineSurface.ClosedU = closedU;
-            surface.BSplineSurface.ClosedV = closedV;
-            surface.BSplineSurface.CurveType = curveType;
 
             break;
         }
