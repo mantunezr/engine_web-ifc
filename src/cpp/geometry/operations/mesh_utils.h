@@ -13,7 +13,7 @@
 #include <spdlog/spdlog.h>
 #include "geometryutils.h"
 #include <glm/glm.hpp>
-
+#include <numeric>
 
 // MANUEL ANTÚNEZ DEBUG <<DELETE>>
 #include <utils/exports/obj/obj.hpp>
@@ -610,7 +610,7 @@ namespace webifc::geometry
 
 			// First: We define the Nurbs surface
 		spdlog::debug("[TriangulateBspline({})]");
-		tinynurbs::RationalSurface3d srf;
+		tinynurbs::Surface<double> srf;
 		srf.degree_u = surface.BSplineSurface.UDegree;
 		srf.degree_v = surface.BSplineSurface.VDegree;
 		size_t num_u = surface.BSplineSurface.ControlPoints.size();
@@ -627,41 +627,56 @@ namespace webifc::geometry
 			++index_delete;
 		}
 		srf.control_points = tinynurbs::array2(num_u, num_v, controlPoints);
-		std::vector<double> weights;
-		for (std::vector<double> row : surface.BSplineSurface.Weights)
-		{
-			for (double weight : row)
-			{
-				weights.push_back(weight);
-			}
-		}
-		if (weights.size() != num_u * num_v)
-		{
-			for (size_t i = 0; i < num_u * num_v; i++)
-			{
-				weights.push_back(1.0);
-			}
-		}
-		srf.weights = tinynurbs::array2(num_u, num_v, weights);
+		// std::vector<double> weights;
+		// for (std::vector<double> row : surface.BSplineSurface.Weights)
+		// {
+		// 	for (double weight : row)
+		// 	{
+		// 		weights.push_back(weight);
+		// 	}
+		// }
+		// if (weights.size() != num_u * num_v)
+		// {
+		// 	for (size_t i = 0; i < num_u * num_v; i++)
+		// 	{
+		// 		weights.push_back(1.0);
+		// 	}
+		// }
+		// srf.weights = tinynurbs::array2(num_u, num_v, weights);
+
+		auto fill_knots = [](std::vector<double>& srf_knots, std::vector<double>const & bs_knots, auto const & bs_mults){
+			auto const num_srf_knots {std::accumulate(bs_mults.begin(), bs_mults.end(), 0.0)};
+			srf_knots.reserve(num_srf_knots);
+			for(size_t knot_i{0}; knot_i < bs_knots.size(); ++knot_i){
+				auto const knot {bs_knots[knot_i]};
+				auto const knot_mult {bs_mults[knot_i]};
+				for(size_t i{0}; i < knot_mult; ++i) srf_knots.push_back(knot);
+			}			
+		};
+
+		fill_knots(srf.knots_u, surface.BSplineSurface.UKnots, surface.BSplineSurface.UMultiplicity);
+		fill_knots(srf.knots_v, surface.BSplineSurface.VKnots, surface.BSplineSurface.VMultiplicity);
 
 
 // https://github.com/IfcOpenShell/IfcOpenShell/blob/v0.7.0/src/ifcgeom/IfcBSplineSurfaceWithKnots.cpp
 
-		for (size_t i = 0; i < surface.BSplineSurface.UMultiplicity.size(); i++)
-		{
-			for (size_t r = 0; r < surface.BSplineSurface.UMultiplicity[i]; r++)
-			{
-				srf.knots_u.push_back(surface.BSplineSurface.UKnots[i]);
-			}
-		}
 
-		for (size_t i = 0; i < surface.BSplineSurface.VMultiplicity.size(); i++)
-		{
-			for (size_t r = 0; r < surface.BSplineSurface.VMultiplicity[i]; r++)
-			{
-				srf.knots_v.push_back(surface.BSplineSurface.VKnots[i]);
-			}
-		}
+
+		// for (size_t i = 0; i < surface.BSplineSurface.UMultiplicity.size(); i++)
+		// {
+		// 	for (size_t r = 0; r < surface.BSplineSurface.UMultiplicity[i]; r++)
+		// 	{
+		// 		srf.knots_u.push_back(surface.BSplineSurface.UKnots[i]);
+		// 	}
+		// }
+
+		// for (size_t i = 0; i < surface.BSplineSurface.VMultiplicity.size(); i++)
+		// {
+		// 	for (size_t r = 0; r < surface.BSplineSurface.VMultiplicity[i]; r++)
+		// 	{
+		// 		srf.knots_v.push_back(surface.BSplineSurface.VKnots[i]);
+		// 	}
+		// }
 
 
 

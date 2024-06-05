@@ -1047,6 +1047,8 @@ namespace webifc::geometry
             _loader.MoveToArgumentOffset(expressID, 10);
             auto indexesSetV = _loader.GetSetArgument();
 
+// https://community.osarch.org/discussion/1103/ifcbsplinecurvewithknots
+
             for (auto &token : knotSetU)
             {
                 UMultiplicity.push_back(_loader.GetIntArgument(token));
@@ -1067,21 +1069,53 @@ namespace webifc::geometry
                 VKnots.push_back(_loader.GetDoubleArgument(token));
             }
 
-            if (UKnots[UKnots.size() - 1] != (int)UKnots[UKnots.size() - 1])
-            {
-                for (uint32_t i = 0; i < UKnots.size(); i++)
-                {
-                    UKnots[i] = UKnots[i] * (UKnots.size() - 1) / UKnots[UKnots.size() - 1];
+            
+            
+            // if (UKnots[UKnots.size() - 1] != (int)UKnots[UKnots.size() - 1])
+            // {
+            //     for (uint32_t i = 0; i < UKnots.size(); i++)
+            //     {
+            //         UKnots[i] = UKnots[i] * (UKnots.size() - 1) / UKnots[UKnots.size() - 1];
+            //     }
+            // }
+
+            // if (VKnots[VKnots.size() - 1] != (int)VKnots[VKnots.size() - 1])
+            // {
+            //     for (uint32_t i = 0; i < VKnots.size(); i++)
+            //     {
+            //         VKnots[i] = VKnots[i] * (VKnots.size() - 1) / VKnots[VKnots.size() - 1];
+            //     }
+            // }
+
+            auto closeControlPoints = [](std::vector<glm::dvec3> row, int degree){
+                for (int i = 0; i < degree; ++i) {
+                    row.push_back(row[i]);
                 }
+            };
+            
+            if (closedU == "T") {
+                for(auto& row : ctrolPts){
+                    closeControlPoints(row, Udegree);
+                }
+            }
+            if (closedV == "T"){
+                std::vector<std::vector<glm::dvec3>> closed_points;
+                for (int i = 0; i < ctrolPts.size(); ++i) {
+                std::vector<glm::dvec3> column;
+                for (const auto& row : ctrolPts) {
+                    column.push_back(row[i]);
+                }
+                closeControlPoints(column, Vdegree);
+                for (int j = 0; j < column.size(); ++j) {
+                    if (i == 0) {
+                        closed_points.push_back({column[j]});
+                    } else {
+                        closed_points[j].push_back(column[j]);
+                    }
+                }
+            } 
             }
 
-            if (VKnots[VKnots.size() - 1] != (int)VKnots[VKnots.size() - 1])
-            {
-                for (uint32_t i = 0; i < VKnots.size(); i++)
-                {
-                    VKnots[i] = VKnots[i] * (VKnots.size() - 1) / VKnots[VKnots.size() - 1];
-                }
-            }
 
             // if (closedU == "T")
             // {
