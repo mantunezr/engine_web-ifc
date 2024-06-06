@@ -1087,33 +1087,35 @@ namespace webifc::geometry
             //     }
             // }
 
-            auto closeControlPoints = [](std::vector<glm::dvec3> row, int degree){
-                for (int i = 0; i < degree; ++i) {
-                    row.push_back(row[i]);
-                }
+            auto add_knot = [](auto& knots, size_t i, size_t degree){
+                auto increment {knots[1]-knots[0]};
+                knots.push_back(knots.back() + increment);
             };
-            
+           
             if (closedU == "T") {
-                for(auto& row : ctrolPts){
-                    closeControlPoints(row, Udegree);
+            auto num_columns {ctrolPts.front().size()};
+        	    for (int i = 0; i < Udegree; ++i) {
+                auto& new_row {ctrolPts.emplace_back()};
+                new_row.reserve(num_columns);
+                for(size_t column_i{0}; column_i < num_columns; ++column_i){
+                    new_row.push_back(ctrolPts[i][column_i]);
                 }
+                add_knot(UKnots, i+1, Udegree);
+				        UMultiplicity.push_back(UMultiplicity[i+1]);
+          	  }
             }
             if (closedV == "T"){
-                std::vector<std::vector<glm::dvec3>> closed_points;
-                for (int i = 0; i < ctrolPts.size(); ++i) {
-                std::vector<glm::dvec3> column;
-                for (const auto& row : ctrolPts) {
-                    column.push_back(row[i]);
-                }
-                closeControlPoints(column, Vdegree);
-                for (int j = 0; j < column.size(); ++j) {
-                    if (i == 0) {
-                        closed_points.push_back({column[j]});
-                    } else {
-                        closed_points[j].push_back(column[j]);
-                    }
-                }
-            } 
+							std::vector<std::vector<glm::dvec3>> new_control_points;
+							new_control_points.reserve(ctrolPts.size() + 2);
+							new_control_points.push_back(ctrolPts.front());
+							for(size_t i_points{0}; i_points < ctrolPts.size(); ++i_points){
+								new_control_points.push_back(ctrolPts[i_points]);
+							}
+							new_control_points.push_back(ctrolPts.back());
+							ctrolPts = new_control_points;
+							auto back {ctrolPts.front().size()};
+							VMultiplicity[0] += 1; 
+							VMultiplicity[VMultiplicity.size()-1] += 1;
             }
 
 
