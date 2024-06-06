@@ -529,7 +529,7 @@ namespace webifc::geometry
 		}
 	}
 
-	inline glm::highp_dvec3 InverseMethod(glm::dvec3 pt, tinynurbs::RationalSurface3d const& srf, double pr, double rotations, double minError, double maxError,
+	inline glm::highp_dvec3 InverseMethod(glm::dvec3 pt, tinynurbs::Surface3d const& srf, IfcSurface const& surface, double pr, double rotations, double minError, double maxError,
 		double& fU, double& fV, double& divisor, double maxDistance)
 	{
 		spdlog::debug("[InverseMethod({})]");
@@ -558,6 +558,7 @@ namespace webifc::geometry
 						{
 							double ffU = fU + incU;
 							double ffV = fV + incV;
+
 							pt00 = tinynurbs::surfacePoint(srf, ffU, ffV);
 							double di = glm::distance(pt00, pt);
 							if (di < maxDistance)
@@ -580,7 +581,7 @@ namespace webifc::geometry
 		return pt00;
 	}
 
-	inline glm::dvec2 BSplineInverseEvaluation(glm::dvec3 pt, tinynurbs::RationalSurface3d const& srf, double scaling)
+	inline glm::dvec2 BSplineInverseEvaluation(glm::dvec3 pt, tinynurbs::Surface3d const& srf, IfcSurface const& surface, double scaling)
 	{
 		spdlog::debug("[BSplineInverseEvaluation({})]");
 		glm::highp_dvec3 ptc = tinynurbs::surfacePoint(srf, 0.0, 0.0);
@@ -600,7 +601,7 @@ namespace webifc::geometry
 		double divisor = 100.0;
 		double maxDistance = 1e+100;
 
-		InverseMethod(pt, srf, pr, rotations, minError / scaling, maxError / scaling, fU, fV, divisor, maxDistance);
+		InverseMethod(pt, srf, surface, pr, rotations, minError / scaling, maxError / scaling, fU, fV, divisor, maxDistance);
 		return {fU, fV};
 	}
 
@@ -649,12 +650,12 @@ namespace webifc::geometry
 
 			// First: We define the Nurbs surface
 		spdlog::debug("[TriangulateBspline({})]");
-		tinynurbs::RationalSurface<double> srf;
+		tinynurbs::Surface3d srf;
 		srf.degree_u = surface.BSplineSurface.UDegree;
 		srf.degree_v = surface.BSplineSurface.VDegree;
 		size_t num_u = surface.BSplineSurface.ControlPoints.size();
 		size_t num_v = surface.BSplineSurface.ControlPoints[0].size();
-		srf.weights = tinynurbs::array2{num_u, num_v, 1.0};
+		//srf.weights = tinynurbs::array2{num_u, num_v, 1.0};
 
 		std::vector<glm::dvec3> controlPoints;
 		for (std::vector<glm::dvec3> row : surface.BSplineSurface.ControlPoints)
@@ -665,6 +666,25 @@ namespace webifc::geometry
 			}
 		}
 		srf.control_points = tinynurbs::array2(num_u, num_v, controlPoints);
+		// TODO: MANUEL ANTÚNEZ DEBUG <<DELETE>>
+		{
+			utils::exports::obj::data_obj obj_data_control_points{};
+			obj_data_control_points.lengths_axis = vector_t{200.0, 200.0, 200.0}; 
+			obj_data_control_points.vertices.reserve(controlPoints.size());
+			obj_data_control_points.material_file = "materials";	
+			for(size_t i {1}; i < controlPoints.size(); ++i){
+				auto p1 {controlPoints[i-0]};
+				auto p0 {controlPoints[i-1]};
+				if(i==1) obj_data_control_points.vertices.emplace_back(p0); 
+				auto& line {obj_data_control_points.lines.emplace_back()};
+				line.material = i;
+				line.indexes.push_back(i);
+				obj_data_control_points.vertices.emplace_back(p1);
+				line.indexes.push_back(i+1);
+			}
+			utils::exports::obj::write_obj(L"exports/objs/control_points.obj", obj_data_control_points);
+		}
+
 		// std::vector<double> weights;
 		// for (std::vector<double> row : surface.BSplineSurface.Weights)
 		// {
@@ -735,23 +755,26 @@ namespace webifc::geometry
 			points.reserve(num_points);
 			for (auto const& pt: bound_points)
 			{
-				if(points.size() == 22){
-					auto a{2};
+				if(points.size() == 11){
+					//break;
 				}
-				glm::dvec2 pInv = BSplineInverseEvaluation(pt, srf, scaling);
+				glm::dvec2 pInv = BSplineInverseEvaluation(pt, srf, surface, scaling);
 				points.emplace_back(Point{pInv.x, pInv.y});
 			}
 
 			// TODO: MANUEL ANTÚNEZ DEBUG <<DELETE>>
 			{
 				utils::exports::obj::data_obj obj_data_lines{};
-				utils::exports::obj::data_obj obj_data_uv{};
 				obj_data_lines.lengths_axis = vector_t{200.0, 200.0, 200.0}; 
-				obj_data_uv.lengths_axis = vector_t{10.0, 10.0, 10.0}; 
 				obj_data_lines.vertices.reserve(num_points);
-				obj_data_uv.vertices.reserve(num_points);
 				obj_data_lines.material_file = "materials";	
+
+				utils::exports::obj::data_obj obj_data_uv{};
+				obj_data_uv.lengths_axis = vector_t{10.0, 10.0, 10.0}; 
+				obj_data_uv.vertices.reserve(num_points);
 				obj_data_uv.material_file = "materials";	
+
+
 				for(size_t i {1}; i < points.size(); ++i){
 					auto const& bs1 {points[i-1]};
 					auto const& bs0 {points[i-0]};

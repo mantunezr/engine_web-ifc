@@ -1087,36 +1087,42 @@ namespace webifc::geometry
             //     }
             // }
 
-            auto add_knot = [](auto& knots, size_t i, size_t degree){
+            auto add_knot = [](auto& knots, size_t i){
                 auto increment {knots[1]-knots[0]};
                 knots.push_back(knots.back() + increment);
             };
            
-            if (closedU == "T") {
+            auto num_rows {ctrolPts.size()};
             auto num_columns {ctrolPts.front().size()};
-        	    for (int i = 0; i < Udegree; ++i) {
-                auto& new_row {ctrolPts.emplace_back()};
-                new_row.reserve(num_columns);
-                for(size_t column_i{0}; column_i < num_columns; ++column_i){
-                    new_row.push_back(ctrolPts[i][column_i]);
-                }
-                add_knot(UKnots, i+1, Udegree);
-				        UMultiplicity.push_back(UMultiplicity[i+1]);
-          	  }
-            }
-            if (closedV == "T"){
-							std::vector<std::vector<glm::dvec3>> new_control_points;
-							new_control_points.reserve(ctrolPts.size() + 2);
-							new_control_points.push_back(ctrolPts.front());
-							for(size_t i_points{0}; i_points < ctrolPts.size(); ++i_points){
-								new_control_points.push_back(ctrolPts[i_points]);
-							}
-							new_control_points.push_back(ctrolPts.back());
-							ctrolPts = new_control_points;
-							auto back {ctrolPts.front().size()};
-							VMultiplicity[0] += 1; 
-							VMultiplicity[VMultiplicity.size()-1] += 1;
-            }
+            // if (closedU == "T") {
+        	  //   for (int i = 0; i < Udegree; ++i) {
+            //     auto& new_row {ctrolPts.emplace_back()};
+            //     new_row.reserve(num_columns);
+            //     for(size_t column_i{0}; column_i < num_columns; ++column_i){
+            //         new_row.push_back(ctrolPts[i][column_i]);
+            //     }
+            //     add_knot(UKnots, i);
+				    //     UMultiplicity.push_back(UMultiplicity[i+1]);
+          	//   }
+            // }
+            // if (closedV == "T"){
+            //     std::vector<std::vector<glm::dvec3>> new_control_points;
+						// 		new_control_points.reserve(ctrolPts.size());
+						// 		for(auto const& row : ctrolPts){
+						// 			auto& new_row{new_control_points.emplace_back()};
+						// 			new_row.reserve(row.size() + 2);
+						// 			for(auto& column : row) new_row.push_back(column);
+						// 			for(size_t i_degree{0}; i_degree < Vdegree; ++i_degree){
+						// 				auto index{num_columns - 3 + i_degree};
+						// 				new_row.push_back(row[index]);
+						// 			}
+						// 		}
+						// 		for(size_t i_degree{0}; i_degree < Vdegree; ++i_degree){
+						// 			add_knot(VKnots, i_degree);
+						// 			VMultiplicity.push_back(1);
+						// 		}
+						// 		ctrolPts = std::move(new_control_points);
+            // }
 
 
             // if (closedU == "T")
@@ -1270,41 +1276,6 @@ namespace webifc::geometry
                     VKnots[i] = VKnots[i] * (VKnots.size() - 1) / VKnots[VKnots.size() - 1];
                 }
             }
-
-            // if (closedU == "T")
-            // {
-            //  std::vector<std::vector<glm::vec<3, glm::f64>>> newCtrolPts;
-            //  for (uint32_t i = 0; i < Udegree; i++)
-            //  {
-            //      newCtrolPts.push_back(ctrolPts[ctrolPts.size() - 1 + (i - Udegree)]);
-            //  }
-            //  for (uint32_t s = 0; s < ctrolPts.size(); s++)
-            //  {
-            //      newCtrolPts.push_back(ctrolPts[s]);
-            //  }
-            //  ctrolPts = newCtrolPts;
-            //  UMultiplicity[0] += Udegree;
-            // }
-
-            // if (closedV == "T")
-            // {
-            //  std::vector<std::vector<glm::vec<3, glm::f64>>> newCtrolPts;
-            //  for (uint32_t r = 0; r < ctrolPts.size(); r++)
-            //  {
-            //      std::vector<glm::vec<3, glm::f64>> newSubList;
-            //      for (uint32_t i = 0; i < Vdegree; i++)
-            //      {
-            //          newSubList.push_back(ctrolPts[r][ctrolPts[r].size() - 1 + (i - Vdegree)]);
-            //      }
-            //      for (uint32_t s = 0; s < ctrolPts[r].size(); s++)
-            //      {
-            //          newSubList.push_back(ctrolPts[r][s]);
-            //      }
-            //      newCtrolPts.push_back(newSubList);
-            //  }
-            //  ctrolPts = newCtrolPts;
-            //  VMultiplicity[0] += Vdegree;
-            // }
 
             surface.BSplineSurface.Active = true;
             surface.BSplineSurface.UDegree = Udegree;
