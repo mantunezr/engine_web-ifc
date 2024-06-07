@@ -529,8 +529,8 @@ namespace webifc::geometry
 		}
 	}
 
-	inline glm::highp_dvec3 InverseMethod(glm::dvec3 pt, tinynurbs::Surface3d const& srf, IfcSurface const& surface, double pr, double rotations, double minError, double maxError,
-		double& fU, double& fV, double& divisor, double maxDistance)
+	inline glm::highp_dvec3 InverseMethod(glm::dvec3 pt, tinynurbs::Surface3d const& srf, double pr, double rotations, double minError, double maxError,
+		double& fU, double& fV, double& divisor, double maxDistance, glm::dvec2 range_knots_u, glm::dvec2 range_knots_v)
 	{
 		spdlog::debug("[InverseMethod({})]");
 		glm::highp_dvec3 pt00{};
@@ -558,7 +558,23 @@ namespace webifc::geometry
 						{
 							double ffU = fU + incU;
 							double ffV = fV + incV;
+							if (ffU < range_knots_u.x)
+							{
+									ffU = range_knots_u.y - (range_knots_u.x - ffU);
+							}
+							else if (ffU > range_knots_u.y)
+							{
+									ffU = range_knots_u.x + (ffU - range_knots_u.y);
+							}
 
+							if (ffV < range_knots_v.x)
+							{
+									ffV = range_knots_v.y - (range_knots_v.x - ffV);
+							}
+							else if (ffV > range_knots_v.y)
+							{
+									ffV = range_knots_v.x + (ffV - range_knots_v.y);
+							}
 							pt00 = tinynurbs::surfacePoint(srf, ffU, ffV);
 							double di = glm::distance(pt00, pt);
 							if (di < maxDistance)
@@ -581,7 +597,7 @@ namespace webifc::geometry
 		return pt00;
 	}
 
-	inline glm::dvec2 BSplineInverseEvaluation(glm::dvec3 pt, tinynurbs::Surface3d const& srf, IfcSurface const& surface, double scaling)
+	inline glm::dvec2 BSplineInverseEvaluation(glm::dvec3 pt, tinynurbs::RationalSurface3d const& srf, double scaling, glm::dvec2 range_knots_u, glm::dvec2 range_knots_v)
 	{
 		spdlog::debug("[BSplineInverseEvaluation({})]");
 		glm::highp_dvec3 ptc = tinynurbs::surfacePoint(srf, 0.0, 0.0);
@@ -601,62 +617,26 @@ namespace webifc::geometry
 		double divisor = 100.0;
 		double maxDistance = 1e+100;
 
-		InverseMethod(pt, srf, surface, pr, rotations, minError / scaling, maxError / scaling, fU, fV, divisor, maxDistance);
+		InverseMethod(pt, srf, pr, rotations, minError / scaling, maxError / scaling, fU, fV, divisor, maxDistance, range_knots_u, range_knots_v);
 		return {fU, fV};
 	}
 
-		// TODO: review and simplify
-	inline void TriangulateBspline(IfcGeometry &geometry, std::vector<IfcBound3D> &bounds, IfcSurface &surface, double scaling)
-	{
-
-
-			// TODO: MANUEL ANTÚNEZ DEBUG <<DELETE>>
-			{
-				utils::exports::obj::data_obj obj_data_bounds{};
-				auto const& points {bounds.front().curve.points};
-				auto const& indexes {bounds.front().curve.indices};
-				obj_data_bounds.lengths_axis = vector_t{300.0, 300.0, 300.0}; 
-				obj_data_bounds.vertices.reserve(points.size());
-				obj_data_bounds.material_file = "materials";
-				auto& lines {obj_data_bounds.lines};
-				auto indexes_uniques {bounds.front().curve.indices};
-				auto it_last {std::unique(indexes_uniques.begin(), indexes_uniques.end())};
-				indexes_uniques.erase(it_last, indexes_uniques.end());
-				std::unordered_map<size_t, size_t> indexed_lines;
-				for(size_t i{0}; i < indexes_uniques.size(); ++i){
-					auto& line {lines.emplace_back()};
-					line.material = i;
-					indexed_lines[indexes_uniques[i]] = i;
-				}
-				size_t index_obj_color{0};
-				for(size_t i{1}; i < indexes.size(); ++i){
-					auto const& index_1{indexes[i-1]};
-					auto const& index_2{indexes[i-0]};
-					if(index_1 != index_2) continue;
-					auto& line {lines[indexed_lines[index_1]]};
-					auto const& point_1 {points[i - 1]};
-					auto const& point_2 {points[i - 0]};
-					obj_data_bounds.vertices.emplace_back(point_1);
-					line.indexes.push_back(obj_data_bounds.vertices.size());
-					obj_data_bounds.vertices.emplace_back(point_2);
-					line.indexes.push_back(obj_data_bounds.vertices.size());
-				}
-				utils::exports::obj::write_obj(L"exports/objs/bounds_BSpline.obj", obj_data_bounds);
-			}
-
-
-
-			//			double limit = 1e-4;
-
-			// First: We define the Nurbs surface
-		spdlog::debug("[TriangulateBspline({})]");
-		tinynurbs::Surface3d srf;
+	inline auto get_nurbs(IfcSurface const& surface){
+		tinynurbs::RationalSurface3d srf;
 		srf.degree_u = surface.BSplineSurface.UDegree;
 		srf.degree_v = surface.BSplineSurface.VDegree;
 		size_t num_u = surface.BSplineSurface.ControlPoints.size();
 		size_t num_v = surface.BSplineSurface.ControlPoints[0].size();
-		//srf.weights = tinynurbs::array2{num_u, num_v, 1.0};
+		srf.weights = tinynurbs::array2{num_u, num_v, 1.0};
+		for (std::vector<double> row : surface.BSplineSurface.Weights)
+		{
+			for (size_t i{0}; i < row.size(); ++i)
+			{
+				srf.weights[i] = row[i];
+			}
+		}
 
+		// control points
 		std::vector<glm::dvec3> controlPoints;
 		for (std::vector<glm::dvec3> row : surface.BSplineSurface.ControlPoints)
 		{
@@ -666,42 +646,8 @@ namespace webifc::geometry
 			}
 		}
 		srf.control_points = tinynurbs::array2(num_u, num_v, controlPoints);
-		// TODO: MANUEL ANTÚNEZ DEBUG <<DELETE>>
-		{
-			utils::exports::obj::data_obj obj_data_control_points{};
-			obj_data_control_points.lengths_axis = vector_t{200.0, 200.0, 200.0}; 
-			obj_data_control_points.vertices.reserve(controlPoints.size());
-			obj_data_control_points.material_file = "materials";	
-			for(size_t i {1}; i < controlPoints.size(); ++i){
-				auto p1 {controlPoints[i-0]};
-				auto p0 {controlPoints[i-1]};
-				if(i==1) obj_data_control_points.vertices.emplace_back(p0); 
-				auto& line {obj_data_control_points.lines.emplace_back()};
-				line.material = i;
-				line.indexes.push_back(i);
-				obj_data_control_points.vertices.emplace_back(p1);
-				line.indexes.push_back(i+1);
-			}
-			utils::exports::obj::write_obj(L"exports/objs/control_points.obj", obj_data_control_points);
-		}
 
-		// std::vector<double> weights;
-		// for (std::vector<double> row : surface.BSplineSurface.Weights)
-		// {
-		// 	for (double weight : row)
-		// 	{
-		// 		weights.push_back(weight);
-		// 	}
-		// }
-		// if (weights.size() != num_u * num_v)
-		// {
-		// 	for (size_t i = 0; i < num_u * num_v; i++)
-		// 	{
-		// 		weights.push_back(1.0);
-		// 	}
-		// }
-		// srf.weights = tinynurbs::array2(num_u, num_v, weights);
-
+		// knots
 		auto expand_knots = [](std::vector<double>& srf_knots, std::vector<double>const & bs_knots, auto const & bs_mults){
 			auto const num_srf_knots {std::accumulate(bs_mults.begin(), bs_mults.end(), 0.0)};
 			srf_knots.reserve(num_srf_knots);
@@ -711,149 +657,170 @@ namespace webifc::geometry
 				for(size_t i{0}; i < knot_mult; ++i) srf_knots.push_back(knot);
 			}			
 		};
-
 		expand_knots(srf.knots_u, surface.BSplineSurface.UKnots, surface.BSplineSurface.UMultiplicity);
 		expand_knots(srf.knots_v, surface.BSplineSurface.VKnots, surface.BSplineSurface.VMultiplicity);
-
-
-// https://github.com/IfcOpenShell/IfcOpenShell/blob/v0.7.0/src/ifcgeom/IfcBSplineSurfaceWithKnots.cpp
-
-
-
-		// for (size_t i = 0; i < surface.BSplineSurface.UMultiplicity.size(); i++)
-		// {
-		// 	for (size_t r = 0; r < surface.BSplineSurface.UMultiplicity[i]; r++)
-		// 	{
-		// 		srf.knots_u.push_back(surface.BSplineSurface.UKnots[i]);
-		// 	}
-		// }
-
-		// for (size_t i = 0; i < surface.BSplineSurface.VMultiplicity.size(); i++)
-		// {
-		// 	for (size_t r = 0; r < surface.BSplineSurface.VMultiplicity[i]; r++)
-		// 	{
-		// 		srf.knots_v.push_back(surface.BSplineSurface.VKnots[i]);
-		// 	}
-		// }
-
-
-
-
-
-		// If the NURBS surface is valid we continue
-
-		if (tinynurbs::surfaceIsValid(srf))
+		glm::dvec2 range_knots_u{
+			srf.knots_u[srf.degree_u],
+			srf.knots_u[srf.knots_u.size() - srf.degree_u - 1]
+		};
+		glm::dvec2 range_knots_v{
+			srf.knots_v[srf.degree_v],
+			srf.knots_v[srf.knots_v.size() - srf.degree_v - 1]
+		};
+		return std::tuple{srf, range_knots_u, range_knots_v};
+	}
+	inline auto get_uv_points(std::vector<IfcBound3D> const& bounds, tinynurbs::RationalSurface3d const& srf, double scaling, glm::dvec2 range_knots_u, glm::dvec2 range_knots_v){
+		using point_t = std::array<double, 2>;
+		using points_t = std::vector<point_t>;
+		auto const& bound_points {bounds[0].curve.points};
+		size_t num_points{bound_points.size()};
+		points_t points;
+		points.reserve(num_points);
+		for (auto const& pt: bound_points)
 		{
-			auto const& bound_points {bounds[0].curve.points};
-			size_t num_points{bound_points.size()};
+			auto pInv = BSplineInverseEvaluation(pt, srf, scaling, range_knots_u, range_knots_v);
+			points.push_back(point_t{pInv.x, pInv.y});
+		}
+		return points;
+	}
 
-			// Find projected boundary using NURBS inverse evaluation
+	// TODO: review and simplify
+	inline void TriangulateBspline(IfcGeometry& geometry, std::vector<IfcBound3D>const & bounds, IfcSurface const& surface, double scaling)
+	{
+		// https://github.com/IfcOpenShell/IfcOpenShell/blob/v0.7.0/src/ifcgeom/IfcBSplineSurfaceWithKnots.cpp
+		// double limit = 1e-4;
 
-			using Point = std::array<double, 2>;
-			using points_t = std::vector<Point>;
-			points_t points;
-			points.reserve(num_points);
-			for (auto const& pt: bound_points)
+		// TODO: MANUEL ANTÚNEZ DEBUG <<DELETE>>
+		{
+			utils::exports::obj::data_obj obj_data_bounds{};
+			auto const& points {bounds.front().curve.points};
+			auto const& indexes {bounds.front().curve.indices};
+			obj_data_bounds.lengths_axis = vector_t{300.0, 300.0, 300.0}; 
+			obj_data_bounds.vertices.reserve(points.size());
+			obj_data_bounds.material_file = "materials";
+			auto& lines {obj_data_bounds.lines};
+			auto indexes_uniques {bounds.front().curve.indices};
+			auto it_last {std::unique(indexes_uniques.begin(), indexes_uniques.end())};
+			indexes_uniques.erase(it_last, indexes_uniques.end());
+			std::unordered_map<size_t, size_t> indexed_lines;
+			for(size_t i{0}; i < indexes_uniques.size(); ++i){
+				auto& line {lines.emplace_back()};
+				line.material = i;
+				indexed_lines[indexes_uniques[i]] = i;
+			}
+			size_t index_obj_color{0};
+			for(size_t i{1}; i < indexes.size(); ++i){
+				auto const& index_1{indexes[i-1]};
+				auto const& index_2{indexes[i-0]};
+				if(index_1 != index_2) continue;
+				auto& line {lines[indexed_lines[index_1]]};
+				auto const& point_1 {points[i - 1]};
+				auto const& point_2 {points[i - 0]};
+				obj_data_bounds.vertices.emplace_back(point_1);
+				line.indexes.push_back(obj_data_bounds.vertices.size());
+				obj_data_bounds.vertices.emplace_back(point_2);
+				line.indexes.push_back(obj_data_bounds.vertices.size());
+			}
+			utils::exports::obj::write_obj(L"exports/objs/bounds_BSpline.obj", obj_data_bounds);
+		}
+		spdlog::debug("[TriangulateBspline({})]");
+		auto [srf, range_knots_u, range_knots_v] {get_nurbs(surface)};
+		if (!tinynurbs::surfaceIsValid(srf)) return;
+		using point_t = std::array<double, 2>;
+		using points_t = std::vector<point_t>;
+		auto uv_points {get_uv_points(bounds, srf, scaling, range_knots_u, range_knots_v)};
+
+		// Triangulate projected boundary
+		auto indices = mapbox::earcut<uint32_t>(std::vector<points_t>{uv_points});
+		
+		// TODO: MANUEL ANTÚNEZ DEBUG <<DELETE>>
+		{
+			auto num_points {uv_points.size()};
+			utils::exports::obj::data_obj obj_data_lines{};
+			obj_data_lines.lengths_axis = vector_t{200.0, 200.0, 200.0}; 
+			obj_data_lines.vertices.reserve(num_points);
+			obj_data_lines.material_file = "materials";	
+
+			utils::exports::obj::data_obj obj_data_uv{};
+			obj_data_uv.lengths_axis = vector_t{10.0, 10.0, 10.0}; 
+			obj_data_uv.vertices.reserve(num_points);
+			obj_data_uv.material_file = "materials";	
+
+
+			for(size_t i {1}; i < uv_points.size(); ++i){
+				auto const& bs1 {uv_points[i-1]};
+				auto const& bs0 {uv_points[i-0]};
+				if(i==1) obj_data_uv.vertices.emplace_back(bs0[0], bs0[1], 0.0); 
+				auto& line_uv {obj_data_uv.lines.emplace_back()};
+				line_uv.material = i;
+				line_uv.indexes.push_back(i);
+				obj_data_uv.vertices.emplace_back(bs1[0], bs1[1], 0.0);
+				line_uv.indexes.push_back(i+1);
+
+				auto p1 {tinynurbs::surfacePoint(srf, bs1[0], bs1[1])};
+				auto p0 {tinynurbs::surfacePoint(srf, bs0[0], bs0[1])};
+				if(i==1) obj_data_lines.vertices.emplace_back(p0); 
+				auto& line {obj_data_lines.lines.emplace_back()};
+				line.material = i;
+				line.indexes.push_back(i);
+				obj_data_lines.vertices.emplace_back(p1);
+				line.indexes.push_back(i+1);
+			}
+			utils::exports::obj::write_obj(L"exports/objs/uv_BSpline.obj", obj_data_uv);
+			utils::exports::obj::write_obj(L"exports/objs/line_BSpline.obj", obj_data_lines);				
+		}
+
+		// Subdivide resulting triangles to increase definition
+		// r indicates the level of subdivision, currently 3 you can increase it to 5
+		for (size_t r = 0; r < 3; r++)
+		{
+			auto num_indices{indices.size()};
+			std::vector<uint32_t> newIndices;
+			newIndices.reserve(num_indices / 3 * 12);
+			points_t newUVPoints;
+			newUVPoints.reserve(num_indices / 3 * 6);
+
+			for (size_t i = 0; i < num_indices; i += 3)
 			{
-				if(points.size() == 11){
-					//break;
-				}
-				glm::dvec2 pInv = BSplineInverseEvaluation(pt, srf, surface, scaling);
-				points.emplace_back(Point{pInv.x, pInv.y});
+				auto const& p0 = newUVPoints.emplace_back(std::move(uv_points[indices[i + 0]]));
+				auto const& p1 = newUVPoints.emplace_back(std::move(uv_points[indices[i + 1]]));
+				auto const& p2 = newUVPoints.emplace_back(std::move(uv_points[indices[i + 2]]));
+				newUVPoints.emplace_back(point_t{(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2});
+				newUVPoints.emplace_back(point_t{(p0[0] + p2[0]) / 2, (p0[1] + p2[1]) / 2});
+				newUVPoints.emplace_back(point_t{(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2});
+
+				int offset = newUVPoints.size() - 6;
+
+				newIndices.push_back(offset + 0);
+				newIndices.push_back(offset + 3);
+				newIndices.push_back(offset + 4);
+
+				newIndices.push_back(offset + 3);
+				newIndices.push_back(offset + 5);
+				newIndices.push_back(offset + 4);
+
+				newIndices.push_back(offset + 3);
+				newIndices.push_back(offset + 1);
+				newIndices.push_back(offset + 5);
+
+				newIndices.push_back(offset + 4);
+				newIndices.push_back(offset + 5);
+				newIndices.push_back(offset + 2);
 			}
 
-			// TODO: MANUEL ANTÚNEZ DEBUG <<DELETE>>
-			{
-				utils::exports::obj::data_obj obj_data_lines{};
-				obj_data_lines.lengths_axis = vector_t{200.0, 200.0, 200.0}; 
-				obj_data_lines.vertices.reserve(num_points);
-				obj_data_lines.material_file = "materials";	
+			uv_points = newUVPoints;
+			indices = newIndices;
+		}
 
-				utils::exports::obj::data_obj obj_data_uv{};
-				obj_data_uv.lengths_axis = vector_t{10.0, 10.0, 10.0}; 
-				obj_data_uv.vertices.reserve(num_points);
-				obj_data_uv.material_file = "materials";	
-
-
-				for(size_t i {1}; i < points.size(); ++i){
-					auto const& bs1 {points[i-1]};
-					auto const& bs0 {points[i-0]};
-					if(i==1) obj_data_uv.vertices.emplace_back(bs0[0], bs0[1], 0.0); 
-					auto& line_uv {obj_data_uv.lines.emplace_back()};
-					line_uv.material = i;
-					line_uv.indexes.push_back(i);
-					obj_data_uv.vertices.emplace_back(bs1[0], bs1[1], 0.0);
-					line_uv.indexes.push_back(i+1);
-
-					auto p1 {tinynurbs::surfacePoint(srf, bs1[0], bs1[1])};
-					auto p0 {tinynurbs::surfacePoint(srf, bs0[0], bs0[1])};
-					if(i==1) obj_data_lines.vertices.emplace_back(p0); 
-					auto& line {obj_data_lines.lines.emplace_back()};
-					line.material = i;
-					line.indexes.push_back(i);
-					obj_data_lines.vertices.emplace_back(p1);
-					line.indexes.push_back(i+1);
-				}
-				utils::exports::obj::write_obj(L"exports/objs/uv_BSpline.obj", obj_data_uv);
-				utils::exports::obj::write_obj(L"exports/objs/line_BSpline.obj", obj_data_lines);				
-			}
-
-
-			// Triangulate projected boundary
-			// Subdivide resulting triangles to increase definition
-			// r indicates the level of subdivision, currently 3 you can increase it to 5
-			std::vector<uint32_t> indices = mapbox::earcut<uint32_t>(std::vector<points_t>{points});
-
-			for (size_t r = 0; r < 3; r++)
-			{
-				auto num_indices{indices.size()};
-				std::vector<uint32_t> newIndices;
-				newIndices.reserve(num_indices / 3 * 12);
-				points_t newUVPoints;
-				newUVPoints.reserve(num_indices / 3 * 6);
-
-				for (size_t i = 0; i < num_indices; i += 3)
-				{
-					auto const& p0 = newUVPoints.emplace_back(std::move(points[indices[i + 0]]));
-					auto const& p1 = newUVPoints.emplace_back(std::move(points[indices[i + 1]]));
-					auto const& p2 = newUVPoints.emplace_back(std::move(points[indices[i + 2]]));
-					newUVPoints.emplace_back(Point{(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2});
-					newUVPoints.emplace_back(Point{(p0[0] + p2[0]) / 2, (p0[1] + p2[1]) / 2});
-					newUVPoints.emplace_back(Point{(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2});
-
-					int offset = newUVPoints.size() - 6;
-
-					newIndices.push_back(offset + 0);
-					newIndices.push_back(offset + 3);
-					newIndices.push_back(offset + 4);
-
-					newIndices.push_back(offset + 3);
-					newIndices.push_back(offset + 5);
-					newIndices.push_back(offset + 4);
-
-					newIndices.push_back(offset + 3);
-					newIndices.push_back(offset + 1);
-					newIndices.push_back(offset + 5);
-
-					newIndices.push_back(offset + 4);
-					newIndices.push_back(offset + 5);
-					newIndices.push_back(offset + 2);
-				}
-
-				points = newUVPoints;
-				indices = newIndices;
-			}
-
-			for (size_t i = 0; i < indices.size(); i += 3)
-			{
-				auto const& p0 = points[indices[i + 0]];
-				auto const& p1 = points[indices[i + 1]];
-				auto const& p2 = points[indices[i + 2]];
-				glm::dvec3 pt00 = tinynurbs::surfacePoint(srf, p0[0], p0[1]);
-				glm::dvec3 pt01 = tinynurbs::surfacePoint(srf, p1[0], p1[1]);
-				glm::dvec3 pt10 = tinynurbs::surfacePoint(srf, p2[0], p2[1]);
-				geometry.AddFace(pt00, pt01, pt10);
-			}
+		for (size_t i = 0; i < indices.size(); i += 3)
+		{
+			auto const& p0 = uv_points[indices[i + 0]];
+			auto const& p1 = uv_points[indices[i + 1]];
+			auto const& p2 = uv_points[indices[i + 2]];
+			glm::dvec3 pt00 = tinynurbs::surfacePoint(srf, p0[0], p0[1]);
+			glm::dvec3 pt01 = tinynurbs::surfacePoint(srf, p1[0], p1[1]);
+			glm::dvec3 pt10 = tinynurbs::surfacePoint(srf, p2[0], p2[1]);
+			geometry.AddFace(pt00, pt01, pt10);
 		}
 	}
 }
