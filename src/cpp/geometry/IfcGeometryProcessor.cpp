@@ -1069,97 +1069,35 @@ namespace webifc::geometry
                 VKnots.push_back(_loader.GetDoubleArgument(token));
             }
 
-            
-            
-            // if (UKnots[UKnots.size() - 1] != (int)UKnots[UKnots.size() - 1])
-            // {
-            //     for (uint32_t i = 0; i < UKnots.size(); i++)
-            //     {
-            //         UKnots[i] = UKnots[i] * (UKnots.size() - 1) / UKnots[UKnots.size() - 1];
-            //     }
-            // }
-
-            // if (VKnots[VKnots.size() - 1] != (int)VKnots[VKnots.size() - 1])
-            // {
-            //     for (uint32_t i = 0; i < VKnots.size(); i++)
-            //     {
-            //         VKnots[i] = VKnots[i] * (VKnots.size() - 1) / VKnots[VKnots.size() - 1];
-            //     }
-            // }
-
-            auto add_knot = [](auto& knots, size_t i){
-                auto increment {knots[1]-knots[0]};
-                knots.push_back(knots.back() + increment);
+            auto get_zscores = [](std::vector<double>& knots)->std::vector<double>{
+              std::vector<double> zscores(knots.size());
+							double mean = std::accumulate(knots.begin(), knots.end(), 0.0) / knots.size();
+							double sq_sum = std::inner_product(knots.begin(), knots.end(), knots.begin(), 0.0);
+							double stdev = std::sqrt(sq_sum / knots.size() - mean * mean);
+							for (size_t i = 0; i < knots.size(); ++i) {
+									zscores[i] = (knots[i] - mean) / stdev;
+							}
+							return zscores;
             };
-           
-            auto num_rows {ctrolPts.size()};
-            auto num_columns {ctrolPts.front().size()};
-            // if (closedU == "T") {
-        	  //   for (int i = 0; i < Udegree; ++i) {
-            //     auto& new_row {ctrolPts.emplace_back()};
-            //     new_row.reserve(num_columns);
-            //     for(size_t column_i{0}; column_i < num_columns; ++column_i){
-            //         new_row.push_back(ctrolPts[i][column_i]);
-            //     }
-            //     add_knot(UKnots, i);
-				    //     UMultiplicity.push_back(UMultiplicity[i+1]);
-          	//   }
-            // }
-            // if (closedV == "T"){
-            //     std::vector<std::vector<glm::dvec3>> new_control_points;
-						// 		new_control_points.reserve(ctrolPts.size());
-						// 		for(auto const& row : ctrolPts){
-						// 			auto& new_row{new_control_points.emplace_back()};
-						// 			new_row.reserve(row.size() + 2);
-						// 			for(auto& column : row) new_row.push_back(column);
-						// 			for(size_t i_degree{0}; i_degree < Vdegree; ++i_degree){
-						// 				auto index{num_columns - 3 + i_degree};
-						// 				new_row.push_back(row[index]);
-						// 			}
-						// 		}
-						// 		for(size_t i_degree{0}; i_degree < Vdegree; ++i_degree){
-						// 			add_knot(VKnots, i_degree);
-						// 			VMultiplicity.push_back(1);
-						// 		}
-						// 		ctrolPts = std::move(new_control_points);
-            // }
-
-
-            // if (closedU == "T")
-            // {
-            //  std::vector<std::vector<glm::vec<3, glm::f64>>> newCtrolPts;
-            //  for (uint32_t i = 0; i < Udegree; i++)
-            //  {
-            //      newCtrolPts.push_back(ctrolPts[ctrolPts.size() - 1 + (i - Udegree)]);
-            //  }
-            //  for (uint32_t s = 0; s < ctrolPts.size(); s++)
-            //  {
-            //      newCtrolPts.push_back(ctrolPts[s]);
-            //  }
-            //  ctrolPts = newCtrolPts;
-            //  UMultiplicity[0] += Udegree;
-            // }
-
-            // if (closedV == "T")
-            // {
-            //  std::vector<std::vector<glm::vec<3, glm::f64>>> newCtrolPts;
-            //  for (uint32_t r = 0; r < ctrolPts.size(); r++)
-            //  {
-            //      std::vector<glm::vec<3, glm::f64>> newSubList;
-            //      for (uint32_t i = 0; i < Vdegree; i++)
-            //      {
-            //          newSubList.push_back(ctrolPts[r][ctrolPts[r].size() - 1 + (i - Vdegree)]);
-            //      }
-            //      for (uint32_t s = 0; s < ctrolPts[r].size(); s++)
-            //      {
-            //          newSubList.push_back(ctrolPts[r][s]);
-            //      }
-            //      newCtrolPts.push_back(newSubList);
-            //  }
-            //  ctrolPts = newCtrolPts;
-            //  VMultiplicity[0] += Vdegree;
-            // }
-
+            auto check_knots = [&](std::vector<double>& knots){
+							auto const num_knots {knots.size()};
+							if(num_knots ==2){
+									knots[0] = 0.0;
+									knots[1] = 1.0;
+									return;
+							}
+							auto threshold {3.0};
+							auto zscores {get_zscores(knots)};
+							for(size_t i{0}; i < num_knots; ++i){
+								if(std::abs(zscores[i]) > threshold){
+									if(i == 0)									knots[i] = knots[i+1];
+									else if (i == num_knots -1)	knots[i] = knots[i-1];
+									else 												knots[i] = (knots[i-1]+knots[i+1]) / 2.0;
+								}
+							}
+            };
+            check_knots(UKnots);
+            check_knots(VKnots);
             surface.BSplineSurface.Active = true;
             surface.BSplineSurface.UDegree = Udegree;
             surface.BSplineSurface.VDegree = Vdegree;
@@ -1170,9 +1108,7 @@ namespace webifc::geometry
             surface.BSplineSurface.VKnots = VKnots;
             surface.BSplineSurface.ClosedU = closedU;
             surface.BSplineSurface.ClosedV = closedV;
-
             return surface;
-
             break;
         }
         case schema::IFCRATIONALBSPLINESURFACEWITHKNOTS:

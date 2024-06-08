@@ -15,6 +15,7 @@
 #include <glm/glm.hpp>
 #include <numeric>
 #include <algorithm>
+#include <CDT.h>
 
 // MANUEL ANTÚNEZ DEBUG <<DELETE>>
 #include <utils/exports/obj/obj.hpp>
@@ -566,7 +567,6 @@ namespace webifc::geometry
 							{
 									ffU = range_knots_u.x + (ffU - range_knots_u.y);
 							}
-
 							if (ffV < range_knots_v.x)
 							{
 									ffV = range_knots_v.y - (range_knots_v.x - ffV);
@@ -574,7 +574,8 @@ namespace webifc::geometry
 							else if (ffV > range_knots_v.y)
 							{
 									ffV = range_knots_v.x + (ffV - range_knots_v.y);
-							}
+							}	
+
 							pt00 = tinynurbs::surfacePoint(srf, ffU, ffV);
 							double di = glm::distance(pt00, pt);
 							if (di < maxDistance)
@@ -607,15 +608,13 @@ namespace webifc::geometry
 		double dh = glm::distance(ptc, pth);
 		double dv = glm::distance(ptc, ptv);
 		double pr = (dh + 1) / (dv + 1);
-
-		double minError = 0.0001;
-		double maxError = 0.01;
-		double rotations = 6;
-
+		constexpr double minError = 0.0001;
+		constexpr double maxError = 0.01;
+		constexpr double rotations = 6;
+		constexpr double maxDistance = 1e+100;
 		double fU = 0.5;
 		double fV = 0.5;
 		double divisor = 100.0;
-		double maxDistance = 1e+100;
 
 		InverseMethod(pt, srf, pr, rotations, minError / scaling, maxError / scaling, fU, fV, divisor, maxDistance, range_knots_u, range_knots_v);
 		return {fU, fV};
@@ -672,16 +671,71 @@ namespace webifc::geometry
 	inline auto get_uv_points(std::vector<IfcBound3D> const& bounds, tinynurbs::RationalSurface3d const& srf, double scaling, glm::dvec2 range_knots_u, glm::dvec2 range_knots_v){
 		using point_t = std::array<double, 2>;
 		using points_t = std::vector<point_t>;
-		auto const& bound_points {bounds[0].curve.points};
-		size_t num_points{bound_points.size()};
 		points_t points;
-		points.reserve(num_points);
-		for (auto const& pt: bound_points)
-		{
-			auto pInv = BSplineInverseEvaluation(pt, srf, scaling, range_knots_u, range_knots_v);
-			points.push_back(point_t{pInv.x, pInv.y});
-		}
+		auto const& bound_points {bounds.front().curve.points};
+		size_t num_points{bound_points.size()};
+		points.resize(num_points);
+		std::transform(bound_points.begin(), bound_points.end(), points.begin(), [&](auto const& point){
+				auto uv {BSplineInverseEvaluation(point, srf, scaling, range_knots_u, range_knots_v)};
+				return point_t{uv.x, uv.y};
+		});
+		std::sort(points.begin(), points.end(),[](auto const& left, auto const& right){
+			  if (left[0] != right[0]) {
+          return left[0] < right[0];
+        }
+        return left[1] < right[1];
+		});
+		auto last_it2 = std::unique(points.begin(), points.end(), [](auto const& a, auto const& b){
+				double EPS{1E-5};
+				return std::abs(a[0] - b[0]) < EPS && std::abs(a[1] - b[1]) < EPS;
+		});
+		points.erase(last_it2, points.end());
+		std::sort(points.begin(), points.end(),[](auto const& left, auto const& right){
+		  return left[1] < right[1];
+		});
 		return points;
+	}
+
+	inline std::vector<uint32_t> get_triangulation_uv_points(std::vector<std::array<double, 2>> const& uv_points){
+		std::vector<uint32_t> result;
+		if(uv_points.empty()) return result;
+		using point_t = std::array<double, 2>;
+		using points_t = std::vector<point_t>;
+		auto num_points {uv_points.size()};
+		auto num_edges {num_points};
+		CDT::Triangulation<double> triangulator{CDT::VertexInsertionOrder::Auto};
+		collection<CDT::V2d<double>> points;
+		points.resize(num_points);
+		std::transform(uv_points.begin(), uv_points.end(), points.begin(), [](auto const& uv_point){
+			return CDT::V2d<double>{uv_point[0], uv_point[1]};
+		});
+
+		try
+		{
+			triangulator.insertVertices(points);
+			triangulator.eraseSuperTriangle();
+			auto const num_indices{triangulator.triangles.size() * 3};
+			result.reserve(triangulator.triangles.size() * 3);
+			for(auto const& triangle : triangulator.triangles){
+				auto & vertice0_id{triangle.vertices[0]};
+				auto & vertice1_id{triangle.vertices[1]};
+				auto & vertice2_id{triangle.vertices[2]};
+				auto vertice0 {glm::dvec2{uv_points[vertice0_id][0], uv_points[vertice0_id][1]}};
+				auto vertice1 {glm::dvec2{uv_points[vertice1_id][0], uv_points[vertice1_id][1]}};
+				auto vertice2 {glm::dvec2{uv_points[vertice2_id][0], uv_points[vertice2_id][1]}};
+				auto area{areaOfTriangle(vertice0, vertice1, vertice2)};
+				constexpr double EPS {1E-3};
+				constexpr double EPS2 {EPS*EPS};
+				if(area < EPS2) {
+					continue;
+				}
+				result.emplace_back(std::move(vertice0_id));
+				result.emplace_back(std::move(vertice1_id));
+				result.emplace_back(std::move(vertice2_id));
+			}
+		}
+		catch(...){ return {};}
+		return result;
 	}
 
 	// TODO: review and simplify
@@ -694,26 +748,13 @@ namespace webifc::geometry
 		{
 			utils::exports::obj::data_obj obj_data_bounds{};
 			auto const& points {bounds.front().curve.points};
-			auto const& indexes {bounds.front().curve.indices};
-			obj_data_bounds.lengths_axis = vector_t{300.0, 300.0, 300.0}; 
+			obj_data_bounds.lengths_axis = vector_t{10.0, 10.0, 10.0}; 
 			obj_data_bounds.vertices.reserve(points.size());
 			obj_data_bounds.material_file = "materials";
 			auto& lines {obj_data_bounds.lines};
-			auto indexes_uniques {bounds.front().curve.indices};
-			auto it_last {std::unique(indexes_uniques.begin(), indexes_uniques.end())};
-			indexes_uniques.erase(it_last, indexes_uniques.end());
-			std::unordered_map<size_t, size_t> indexed_lines;
-			for(size_t i{0}; i < indexes_uniques.size(); ++i){
-				auto& line {lines.emplace_back()};
-				line.material = i;
-				indexed_lines[indexes_uniques[i]] = i;
-			}
 			size_t index_obj_color{0};
-			for(size_t i{1}; i < indexes.size(); ++i){
-				auto const& index_1{indexes[i-1]};
-				auto const& index_2{indexes[i-0]};
-				if(index_1 != index_2) continue;
-				auto& line {lines[indexed_lines[index_1]]};
+			for(size_t i{1}; i < points.size(); ++i){
+				auto& line {lines.emplace_back()};
 				auto const& point_1 {points[i - 1]};
 				auto const& point_2 {points[i - 0]};
 				obj_data_bounds.vertices.emplace_back(point_1);
@@ -731,43 +772,50 @@ namespace webifc::geometry
 		auto uv_points {get_uv_points(bounds, srf, scaling, range_knots_u, range_knots_v)};
 
 		// Triangulate projected boundary
-		auto indices = mapbox::earcut<uint32_t>(std::vector<points_t>{uv_points});
-		
+		//auto indices = mapbox::earcut<uint32_t>(std::vector<points_t>{uv_points});
+		auto indices {get_triangulation_uv_points(uv_points)};
+
 		// TODO: MANUEL ANTÚNEZ DEBUG <<DELETE>>
 		{
 			auto num_points {uv_points.size()};
-			utils::exports::obj::data_obj obj_data_lines{};
-			obj_data_lines.lengths_axis = vector_t{200.0, 200.0, 200.0}; 
-			obj_data_lines.vertices.reserve(num_points);
-			obj_data_lines.material_file = "materials";	
+			utils::exports::obj::data_obj obj_data_triangles{};
+			obj_data_triangles.lengths_axis = vector_t{200.0, 200.0, 200.0};
+			obj_data_triangles.vertices.reserve(num_points);
+			obj_data_triangles.material_file = "materials";
 
-			utils::exports::obj::data_obj obj_data_uv{};
-			obj_data_uv.lengths_axis = vector_t{10.0, 10.0, 10.0}; 
-			obj_data_uv.vertices.reserve(num_points);
-			obj_data_uv.material_file = "materials";	
+			utils::exports::obj::data_obj obj_data_uv_triangles{};
+			obj_data_uv_triangles.lengths_axis = vector_t{10.0, 10.0, 10.0}; 
+			obj_data_uv_triangles.vertices.reserve(num_points);
+			obj_data_uv_triangles.material_file = "materials";
 
-
-			for(size_t i {1}; i < uv_points.size(); ++i){
-				auto const& bs1 {uv_points[i-1]};
-				auto const& bs0 {uv_points[i-0]};
-				if(i==1) obj_data_uv.vertices.emplace_back(bs0[0], bs0[1], 0.0); 
-				auto& line_uv {obj_data_uv.lines.emplace_back()};
+			for(size_t i {0}; i < indices.size(); i+=3){
+				auto& line_uv {obj_data_uv_triangles.lines.emplace_back()};
 				line_uv.material = i;
-				line_uv.indexes.push_back(i);
-				obj_data_uv.vertices.emplace_back(bs1[0], bs1[1], 0.0);
-				line_uv.indexes.push_back(i+1);
+				auto const& i0{indices[i+0]};
+				auto const& i1{indices[i+1]};
+				auto const& i2{indices[i+2]};
+				auto const& uv0{uv_points[i0]};
+				auto const& uv1{uv_points[i1]};
+				auto const& uv2{uv_points[i2]};
+				obj_data_uv_triangles.vertices.emplace_back(uv0[0], uv0[1], 0.0); 
+				line_uv.indexes.push_back(obj_data_uv_triangles.vertices.size());
+				obj_data_uv_triangles.vertices.emplace_back(uv1[0], uv1[1], 0.0); 
+				line_uv.indexes.push_back(obj_data_uv_triangles.vertices.size());
+				obj_data_uv_triangles.vertices.emplace_back(uv2[0], uv2[1], 0.0); 
+				line_uv.indexes.push_back(obj_data_uv_triangles.vertices.size());
+				line_uv.indexes.push_back(obj_data_uv_triangles.vertices.size()-2);
 
-				auto p1 {tinynurbs::surfacePoint(srf, bs1[0], bs1[1])};
-				auto p0 {tinynurbs::surfacePoint(srf, bs0[0], bs0[1])};
-				if(i==1) obj_data_lines.vertices.emplace_back(p0); 
-				auto& line {obj_data_lines.lines.emplace_back()};
-				line.material = i;
-				line.indexes.push_back(i);
-				obj_data_lines.vertices.emplace_back(p1);
-				line.indexes.push_back(i+1);
+				// auto p1 {tinynurbs::surfacePoint(srf, bs1[0], bs1[1])};
+				// auto p0 {tinynurbs::surfacePoint(srf, bs0[0], bs0[1])};
+				// if(i==1) obj_data_triangles.vertices.emplace_back(p0); 
+				// auto& line {obj_data_triangles.lines.emplace_back()};
+				// line.material = i;
+				// line.indexes.push_back(i);
+				// obj_data_triangles.vertices.emplace_back(p1);
+				// line.indexes.push_back(i+1);
 			}
-			utils::exports::obj::write_obj(L"exports/objs/uv_BSpline.obj", obj_data_uv);
-			utils::exports::obj::write_obj(L"exports/objs/line_BSpline.obj", obj_data_lines);				
+			utils::exports::obj::write_obj(L"exports/objs/uv_triangulate_BSpline.obj", obj_data_uv_triangles);
+			//utils::exports::obj::write_obj(L"exports/objs/line_BSpline.obj", obj_data_triangles);
 		}
 
 		// Subdivide resulting triangles to increase definition
