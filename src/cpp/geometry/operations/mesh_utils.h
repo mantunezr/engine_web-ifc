@@ -743,27 +743,6 @@ namespace webifc::geometry
 	{
 		// https://github.com/IfcOpenShell/IfcOpenShell/blob/v0.7.0/src/ifcgeom/IfcBSplineSurfaceWithKnots.cpp
 		// double limit = 1e-4;
-
-		// TODO: MANUEL ANTÚNEZ DEBUG <<DELETE>>
-		{
-			utils::exports::obj::data_obj obj_data_bounds{};
-			auto const& points {bounds.front().curve.points};
-			obj_data_bounds.lengths_axis = vector_t{10.0, 10.0, 10.0}; 
-			obj_data_bounds.vertices.reserve(points.size());
-			obj_data_bounds.material_file = "materials";
-			auto& lines {obj_data_bounds.lines};
-			size_t index_obj_color{0};
-			for(size_t i{1}; i < points.size(); ++i){
-				auto& line {lines.emplace_back()};
-				auto const& point_1 {points[i - 1]};
-				auto const& point_2 {points[i - 0]};
-				obj_data_bounds.vertices.emplace_back(point_1);
-				line.indexes.push_back(obj_data_bounds.vertices.size());
-				obj_data_bounds.vertices.emplace_back(point_2);
-				line.indexes.push_back(obj_data_bounds.vertices.size());
-			}
-			utils::exports::obj::write_obj(L"exports/objs/bounds_BSpline.obj", obj_data_bounds);
-		}
 		spdlog::debug("[TriangulateBspline({})]");
 		auto [srf, range_knots_u, range_knots_v] {get_nurbs(surface)};
 		if (!tinynurbs::surfaceIsValid(srf)) return;
@@ -774,49 +753,6 @@ namespace webifc::geometry
 		// Triangulate projected boundary
 		//auto indices = mapbox::earcut<uint32_t>(std::vector<points_t>{uv_points});
 		auto indices {get_triangulation_uv_points(uv_points)};
-
-		// TODO: MANUEL ANTÚNEZ DEBUG <<DELETE>>
-		{
-			auto num_points {uv_points.size()};
-			utils::exports::obj::data_obj obj_data_triangles{};
-			obj_data_triangles.lengths_axis = vector_t{200.0, 200.0, 200.0};
-			obj_data_triangles.vertices.reserve(num_points);
-			obj_data_triangles.material_file = "materials";
-
-			utils::exports::obj::data_obj obj_data_uv_triangles{};
-			obj_data_uv_triangles.lengths_axis = vector_t{10.0, 10.0, 10.0}; 
-			obj_data_uv_triangles.vertices.reserve(num_points);
-			obj_data_uv_triangles.material_file = "materials";
-
-			for(size_t i {0}; i < indices.size(); i+=3){
-				auto& line_uv {obj_data_uv_triangles.lines.emplace_back()};
-				line_uv.material = i;
-				auto const& i0{indices[i+0]};
-				auto const& i1{indices[i+1]};
-				auto const& i2{indices[i+2]};
-				auto const& uv0{uv_points[i0]};
-				auto const& uv1{uv_points[i1]};
-				auto const& uv2{uv_points[i2]};
-				obj_data_uv_triangles.vertices.emplace_back(uv0[0], uv0[1], 0.0); 
-				line_uv.indexes.push_back(obj_data_uv_triangles.vertices.size());
-				obj_data_uv_triangles.vertices.emplace_back(uv1[0], uv1[1], 0.0); 
-				line_uv.indexes.push_back(obj_data_uv_triangles.vertices.size());
-				obj_data_uv_triangles.vertices.emplace_back(uv2[0], uv2[1], 0.0); 
-				line_uv.indexes.push_back(obj_data_uv_triangles.vertices.size());
-				line_uv.indexes.push_back(obj_data_uv_triangles.vertices.size()-2);
-
-				// auto p1 {tinynurbs::surfacePoint(srf, bs1[0], bs1[1])};
-				// auto p0 {tinynurbs::surfacePoint(srf, bs0[0], bs0[1])};
-				// if(i==1) obj_data_triangles.vertices.emplace_back(p0); 
-				// auto& line {obj_data_triangles.lines.emplace_back()};
-				// line.material = i;
-				// line.indexes.push_back(i);
-				// obj_data_triangles.vertices.emplace_back(p1);
-				// line.indexes.push_back(i+1);
-			}
-			utils::exports::obj::write_obj(L"exports/objs/uv_triangulate_BSpline.obj", obj_data_uv_triangles);
-			//utils::exports::obj::write_obj(L"exports/objs/line_BSpline.obj", obj_data_triangles);
-		}
 
 		// Subdivide resulting triangles to increase definition
 		// r indicates the level of subdivision, currently 3 you can increase it to 5
