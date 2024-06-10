@@ -17,12 +17,6 @@
 #include <algorithm>
 #include <CDT.h>
 
-// MANUEL ANTÚNEZ DEBUG <<DELETE>>
-#include <utils/exports/obj/obj.hpp>
-
-
-
-
 #define CONST_PI 3.141592653589793238462643383279502884L
 
 namespace webifc::geometry
