@@ -698,7 +698,7 @@ namespace webifc::geometry
 		auto num_points {uv_points.size()};
 		auto num_edges {num_points};
 		CDT::Triangulation<double> triangulator{CDT::VertexInsertionOrder::Auto};
-		collection<CDT::V2d<double>> points;
+		std::vector<CDT::V2d<double>> points;
 		points.resize(num_points);
 		std::transform(uv_points.begin(), uv_points.end(), points.begin(), [](auto const& uv_point){
 			return CDT::V2d<double>{uv_point[0], uv_point[1]};
@@ -748,47 +748,47 @@ namespace webifc::geometry
 		//auto indices = mapbox::earcut<uint32_t>(std::vector<points_t>{uv_points});
 		auto indices {get_triangulation_uv_points(uv_points)};
 
-		// Subdivide resulting triangles to increase definition
-		// r indicates the level of subdivision, currently 3 you can increase it to 5
-		for (size_t r = 0; r < 3; r++)
-		{
-			auto num_indices{indices.size()};
-			std::vector<uint32_t> newIndices;
-			newIndices.reserve(num_indices / 3 * 12);
-			points_t newUVPoints;
-			newUVPoints.reserve(num_indices / 3 * 6);
+		// // Subdivide resulting triangles to increase definition
+		// // r indicates the level of subdivision, currently 3 you can increase it to 5
+		// for (size_t r = 0; r < 3; r++)
+		// {
+		// 	auto num_indices{indices.size()};
+		// 	std::vector<uint32_t> newIndices;
+		// 	newIndices.reserve(num_indices / 3 * 12);
+		// 	points_t newUVPoints;
+		// 	newUVPoints.reserve(num_indices / 3 * 6);
 
-			for (size_t i = 0; i < num_indices; i += 3)
-			{
-				auto const& p0 = newUVPoints.emplace_back(std::move(uv_points[indices[i + 0]]));
-				auto const& p1 = newUVPoints.emplace_back(std::move(uv_points[indices[i + 1]]));
-				auto const& p2 = newUVPoints.emplace_back(std::move(uv_points[indices[i + 2]]));
-				newUVPoints.emplace_back(point_t{(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2});
-				newUVPoints.emplace_back(point_t{(p0[0] + p2[0]) / 2, (p0[1] + p2[1]) / 2});
-				newUVPoints.emplace_back(point_t{(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2});
+		// 	for (size_t i = 0; i < num_indices; i += 3)
+		// 	{
+		// 		auto const& p0 = newUVPoints.emplace_back(std::move(uv_points[indices[i + 0]]));
+		// 		auto const& p1 = newUVPoints.emplace_back(std::move(uv_points[indices[i + 1]]));
+		// 		auto const& p2 = newUVPoints.emplace_back(std::move(uv_points[indices[i + 2]]));
+		// 		newUVPoints.emplace_back(point_t{(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2});
+		// 		newUVPoints.emplace_back(point_t{(p0[0] + p2[0]) / 2, (p0[1] + p2[1]) / 2});
+		// 		newUVPoints.emplace_back(point_t{(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2});
 
-				int offset = newUVPoints.size() - 6;
+		// 		int offset = newUVPoints.size() - 6;
 
-				newIndices.push_back(offset + 0);
-				newIndices.push_back(offset + 3);
-				newIndices.push_back(offset + 4);
+		// 		newIndices.push_back(offset + 0);
+		// 		newIndices.push_back(offset + 3);
+		// 		newIndices.push_back(offset + 4);
 
-				newIndices.push_back(offset + 3);
-				newIndices.push_back(offset + 5);
-				newIndices.push_back(offset + 4);
+		// 		newIndices.push_back(offset + 3);
+		// 		newIndices.push_back(offset + 5);
+		// 		newIndices.push_back(offset + 4);
 
-				newIndices.push_back(offset + 3);
-				newIndices.push_back(offset + 1);
-				newIndices.push_back(offset + 5);
+		// 		newIndices.push_back(offset + 3);
+		// 		newIndices.push_back(offset + 1);
+		// 		newIndices.push_back(offset + 5);
 
-				newIndices.push_back(offset + 4);
-				newIndices.push_back(offset + 5);
-				newIndices.push_back(offset + 2);
-			}
+		// 		newIndices.push_back(offset + 4);
+		// 		newIndices.push_back(offset + 5);
+		// 		newIndices.push_back(offset + 2);
+		// 	}
 
-			uv_points = newUVPoints;
-			indices = newIndices;
-		}
+		// 	uv_points = newUVPoints;
+		// 	indices = newIndices;
+		// }
 
 		for (size_t i = 0; i < indices.size(); i += 3)
 		{
