@@ -82,5 +82,8 @@
     "crypto": false,
     "path": false,
     "fs": false
+  },
+  "dependencies": {
+    "web-ifc": "file:"
   }
 }
