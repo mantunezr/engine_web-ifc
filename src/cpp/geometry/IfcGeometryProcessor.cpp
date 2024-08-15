@@ -1721,37 +1721,34 @@ namespace webifc::geometry
     }
 
     auto booleanManager::convert_to_fenix(IfcGeometry const& geometry) const{
-        fenix::boolean_engine::points_t points(geometry.numPoints);
-        fenix::boolean_engine::faces_t faces(geometry.numFaces);
-        auto const& vertices {geometry.fvertexData};
+        fenix::boolean_engine::points_t points;
+        points.reserve(geometry.numPoints);
+        fenix::boolean_engine::faces_t faces;
+        faces.reserve(geometry.numFaces);
+        auto const& vertices {geometry.vertexData};
         auto const& indexes {geometry.indexData};
 
-        size_t i {0};
-        std::transform(vertices.begin(), vertices.end(), points.begin(), [&](float) mutable{
-            auto point {fenix::boolean_engine::point_t{
-                vertices[i + 0],
-                vertices[i + 1],
-                vertices[i + 2]
-            }};
-            i += 6;
-            return point; 
-        });
-        i = 0;
-        std::transform(indexes.begin(), indexes.end(), faces.begin(), [&](uint32_t) mutable {
-            auto const nomal_index {i / 3 * 6 + 3};
-            return fenix::boolean_engine::face_t(
+        for(size_t i{0}; i < geometry.vertexData.size(); i+= 6){
+            points.emplace_back(
+                static_cast<float>(vertices[i + 0]),
+                static_cast<float>(vertices[i + 1]),
+                static_cast<float>(vertices[i + 2]));
+        }
+        for(size_t i{0}; i < geometry.numFaces; ++i){
+            auto const face{geometry.GetFace(i)};
+            auto const nomal_index {face.i0 * 6 + 3};
+            faces.emplace_back(
                 i,
-                indexes[i + 0],
-                indexes[i + 1],
-                indexes[i + 2],
+                face.i0,
+                face.i1,
+                face.i2,
                 fenix::boolean_engine::vector_t {
                     vertices[nomal_index + 0],
                     vertices[nomal_index + 1],
                     vertices[nomal_index + 2],
                 }
             );
-            i += 3;
-        });
+        }
         return std::tuple {points, faces};
     }
 
@@ -1760,7 +1757,7 @@ namespace webifc::geometry
     {
         auto [first_points, first_faces] = this->convert_to_fenix(firstOperator);
         auto [second_points, second_faces] = this->convert_to_fenix(secondOperator);
-        auto const result {fenix::boolean_engine::substract(first_points, first_faces, second_points, second_faces)};
+        auto const result {fenix::boolean_engine::operations::substract(first_points, first_faces, second_points, second_faces)};
 
         return {};
     }
