@@ -27,10 +27,13 @@ namespace webifc::geometry
     public:
       IfcGeometry BoolProcess(const std::vector<IfcGeometry> &firstGeoms, std::vector<IfcGeometry> &secondGeoms, std::string op);
     private:
+      auto convert_to_fenix(IfcGeometry const& geometry) const;
       fuzzybools::Geometry convertToEngine(Geometry geom);
       IfcGeometry convertToWebIfc(fuzzybools::Geometry geom);
       IfcGeometry Union(IfcGeometry firstOperator, IfcGeometry secondOperator);
-      IfcGeometry Subtract(IfcGeometry firstOperator, IfcGeometry secondOperator);
+      IfcGeometry Subtract_old(IfcGeometry firstOperator, IfcGeometry secondOperator);
+      IfcGeometry Subtract(IfcGeometry const& firstOperator, IfcGeometry const& secondOperator);
+
   };
 
   class IfcGeometryProcessor 
@@ -67,6 +70,8 @@ namespace webifc::geometry
         void AddComposedMeshToFlatMesh(IfcFlatMesh &flatMesh, const IfcComposedMesh &composedMesh, const glm::dmat4 &parentMatrix = glm::dmat4(1), const glm::dvec4 &color = glm::dvec4(1, 1, 1, 1), bool hasColor = false);
         std::vector<uint32_t> Read2DArrayOfThreeIndices();
         void ReadIndexedPolygonalFace(uint32_t expressID, std::vector<IfcBound3D> &bounds, const std::vector<glm::dvec3> &points);
+    
+       
         IfcGeometry predefinedCylinder;
         IfcGeometry predefinedCube;
   };

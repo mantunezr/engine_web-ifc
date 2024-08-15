@@ -16,6 +16,11 @@
 #include "operations/mesh_utils.h"
 #include "operations/boolean-utils/fuzzy-bools.h"
 
+
+#include "../../../cpp-boolean-engine/include/boolean_engine.hpp"
+#include <algorithm>
+#include <tuple>
+
 namespace webifc::geometry
 {
     IfcGeometryProcessor::IfcGeometryProcessor(const webifc::parsing::IfcLoader &loader, const webifc::schema::IfcSchemaManager &schemaManager, uint16_t circleSegments, bool coordinateToOrigin)
@@ -1707,11 +1712,57 @@ namespace webifc::geometry
         return convertToWebIfc(fuzzybools::Union(firstEngGeom, secondEngGeom));
     }
 
-    IfcGeometry booleanManager::Subtract(IfcGeometry firstOperator, IfcGeometry secondOperator)
+
+    IfcGeometry booleanManager::Subtract_old(IfcGeometry firstOperator, IfcGeometry secondOperator)
     {
         fuzzybools::Geometry firstEngGeom = convertToEngine(firstOperator);
         fuzzybools::Geometry secondEngGeom = convertToEngine(secondOperator);
         return convertToWebIfc(fuzzybools::Subtract(firstEngGeom, secondEngGeom));
+    }
+
+    auto booleanManager::convert_to_fenix(IfcGeometry const& geometry) const{
+        fenix::boolean_engine::points_t points(geometry.numPoints);
+        fenix::boolean_engine::faces_t faces(geometry.numFaces);
+        auto const& vertices {geometry.fvertexData};
+        auto const& indexes {geometry.indexData};
+
+        size_t i {0};
+        std::transform(vertices.begin(), vertices.end(), points.begin(), [&](float) mutable{
+            auto point {fenix::boolean_engine::point_t{
+                vertices[i + 0],
+                vertices[i + 1],
+                vertices[i + 2]
+            }};
+            i += 6;
+            return point; 
+        });
+        i = 0;
+        std::transform(indexes.begin(), indexes.end(), faces.begin(), [&](uint32_t) mutable {
+            auto const nomal_index {i / 3 * 6 + 3};
+            return fenix::boolean_engine::face_t(
+                i,
+                indexes[i + 0],
+                indexes[i + 1],
+                indexes[i + 2],
+                fenix::boolean_engine::vector_t {
+                    vertices[nomal_index + 0],
+                    vertices[nomal_index + 1],
+                    vertices[nomal_index + 2],
+                }
+            );
+            i += 3;
+        });
+        return std::tuple {points, faces};
+    }
+
+
+    IfcGeometry booleanManager::Subtract(IfcGeometry const& firstOperator, IfcGeometry const& secondOperator)
+    {
+        auto [first_points, first_faces] = this->convert_to_fenix(firstOperator);
+        auto [second_points, second_faces] = this->convert_to_fenix(secondOperator);
+        auto const result {fenix::boolean_engine::substract(first_points, first_faces, second_points, second_faces)};
+
+        return {};
     }
 
 }
