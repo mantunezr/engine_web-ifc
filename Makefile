@@ -36,7 +36,7 @@ endef
 
 NAME				:= thatopen
 APP 				:= lib${NAME}.a
-OUT					:= out
+OUT					:= ../out
 SRC					:= ./src/cpp
 OBJ					:= ../obj/${NAME}
 CC					:= g++
