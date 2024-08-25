@@ -20,12 +20,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-# lib booleanengine
-include(ExternalProject)
-set(LIBBOOLEANENGINE_PATH "${CMAKE_SOURCE_DIR}/../../../cpp-boolean-engine")
-
-add_subdirectory(${LIBBOOLEANENGINE_PATH})
-
 # collect source files
 file(GLOB WebIfcParsing parsing/*.cpp)
 file(GLOB_RECURSE WebIfcGeometry geometry/*.cpp)
@@ -38,6 +32,11 @@ file(GLOB WebIfcTestSourceFiles test/*.cpp)
 file(GLOB WebIfcTestingMain web-ifc-test.cpp)
 
 # download the external projects and save their paths
+Message("Downloading boolean engine")
+FetchContent_Declare(boolean_engine GIT_REPOSITORY "https://github.com/mantunezr/cpp-boolean-engine.git" GIT_TAG main)
+FetchContent_MakeAvailable(boolean_engine)
+FetchContent_GetProperties(boolean_engine)
+
 Message("Downloading FastFloat")
 FetchContent_Declare(fastfloat GIT_REPOSITORY "https://github.com/fastfloat/fast_float" GIT_TAG "2b2395f9ac836ffca6404424bcc252bff7aa80e4" SOURCE_SUBDIR "../")
 FetchContent_MakeAvailable(fastfloat)
@@ -126,9 +125,9 @@ if(EMSCRIPTEN)
 	target_compile_options(web-ifc-mt PUBLIC "-pthread")
 	
 	set_target_properties(web-ifc-mt PROPERTIES LINK_FLAGS "${DEBUG_FLAG} -pthread -s PTHREAD_POOL_SIZE=navigator.hardwareConcurrency --bind -flto --define-macro=REAL_T_IS_DOUBLE -sSTACK_SIZE=5MB -s ALLOW_MEMORY_GROWTH=1 -s MAXIMUM_MEMORY=4GB -s EXPORT_NAME=WebIFCWasm -s MODULARIZE=1 -s ENVIRONMENT=web,worker")
-endif()
-
-target_link_libraries(${THE_EXECUTABLE} PUBLIC libbooleanengine.a)
+	
+	target_link_libraries(web-ifc PUBLIC boolean_engine)
+	endif()
 
 if(NOT EMSCRIPTEN)
 	# build parameters for web-ifc-test
