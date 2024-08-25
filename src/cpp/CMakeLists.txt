@@ -2,7 +2,7 @@
 include(FetchContent)
 cmake_policy(SET CMP0054 NEW)
 cmake_minimum_required(VERSION 3.18)
-
+set(OUT_NAME web-ifc)
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 	message("Building In Debug Mode")
 	set(RELEASE false)
@@ -19,6 +19,12 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
+# lib booleanengine
+include(ExternalProject)
+set(LIBBOOLEANENGINE_PATH "${CMAKE_SOURCE_DIR}/../../../cpp-boolean-engine")
+
+add_subdirectory(${LIBBOOLEANENGINE_PATH})
 
 # collect source files
 file(GLOB WebIfcParsing parsing/*.cpp)
@@ -118,8 +124,11 @@ if(EMSCRIPTEN)
 	add_executable(web-ifc-mt ${WebIfcManager} ${WebIfcSchema} ${WebIfcParsing} ${WebIfcAPI} ${WebIfcUtility} ${WebIfcGeometry})
 	param_setter(web-ifc-mt)
 	target_compile_options(web-ifc-mt PUBLIC "-pthread")
+	
 	set_target_properties(web-ifc-mt PROPERTIES LINK_FLAGS "${DEBUG_FLAG} -pthread -s PTHREAD_POOL_SIZE=navigator.hardwareConcurrency --bind -flto --define-macro=REAL_T_IS_DOUBLE -sSTACK_SIZE=5MB -s ALLOW_MEMORY_GROWTH=1 -s MAXIMUM_MEMORY=4GB -s EXPORT_NAME=WebIFCWasm -s MODULARIZE=1 -s ENVIRONMENT=web,worker")
 endif()
+
+target_link_libraries(${THE_EXECUTABLE} PUBLIC libbooleanengine.a)
 
 if(NOT EMSCRIPTEN)
 	# build parameters for web-ifc-test
