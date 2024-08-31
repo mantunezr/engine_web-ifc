@@ -32,11 +32,6 @@ file(GLOB WebIfcTestSourceFiles test/*.cpp)
 file(GLOB WebIfcTestingMain web-ifc-test.cpp)
 
 # download the external projects and save their paths
-Message("Downloading boolean engine")
-FetchContent_Declare(boolean_engine GIT_REPOSITORY "https://github.com/mantunezr/cpp-boolean-engine.git" GIT_TAG main)
-FetchContent_MakeAvailable(boolean_engine)
-FetchContent_GetProperties(boolean_engine)
-
 Message("Downloading FastFloat")
 FetchContent_Declare(fastfloat GIT_REPOSITORY "https://github.com/fastfloat/fast_float" GIT_TAG "2b2395f9ac836ffca6404424bcc252bff7aa80e4" SOURCE_SUBDIR "../")
 FetchContent_MakeAvailable(fastfloat)
@@ -65,7 +60,7 @@ FetchContent_MakeAvailable(earcut)
 FetchContent_GetProperties(earcut)
 
 Message("Downloading CDT")
-FetchContent_Declare(cdt GIT_REPOSITORY "https://github.com/artem-ogre/CDT" GIT_TAG "4d0c9026b8ec846fe544897e7111f8f9080d5f8a" SOURCE_SUBDIR "../")
+FetchContent_Declare(cdt GIT_REPOSITORY "https://github.com/artem-ogre/CDT" GIT_TAG "46f1ce1f495a97617d90e8c833d0d29406335fdf" SOURCE_SUBDIR "../")
 
 # FetchContent_Declare(cdt GIT_REPOSITORY "https://github.com/artem-ogre/CDT" GIT_TAG "9d99b32ae56b26cd2781678dc4405c98b8679a9f" SOURCE_SUBDIR "../")
 FetchContent_MakeAvailable(cdt)
@@ -76,9 +71,12 @@ FetchContent_Declare(spdlog GIT_REPOSITORY "https://github.com/gabime/spdlog" GI
 FetchContent_MakeAvailable(spdlog)
 FetchContent_GetProperties(spdlog)
 
-message(${WebIfcGeometryH})
+Message("Downloading boolean engine")
+FetchContent_Declare(boolean_engine GIT_REPOSITORY "https://github.com/mantunezr/cpp-boolean-engine.git" GIT_TAG main GIT_SUBMODULES "" SOURCE_SUBDIR "../")
+FetchContent_MakeAvailable(boolean_engine)
 
-Message("Downloads Finished")
+file(GLOB_RECURSE boolean_engine_CPP_FILES ${boolean_engine_SOURCE_DIR}/src/*.cpp)
+Message("added boolean engine library")
 
 function(PARAM_SETTER THE_EXECUTABLE)
 	target_include_directories(${THE_EXECUTABLE} PUBLIC ${tinynurbs_SOURCE_DIR}/include)
@@ -89,6 +87,7 @@ function(PARAM_SETTER THE_EXECUTABLE)
 	target_include_directories(${THE_EXECUTABLE} PUBLIC ${earcut_SOURCE_DIR}/include)
 	target_include_directories(${THE_EXECUTABLE} PUBLIC ${fuzzy_SOURCE_DIR}/)
 	target_include_directories(${THE_EXECUTABLE} PUBLIC ${spdlog_SOURCE_DIR}/include)
+	target_include_directories(${THE_EXECUTABLE} PUBLIC ${boolean_engine_SOURCE_DIR})
 
 	if(NOT MSVC)
 		target_compile_options(${THE_EXECUTABLE} PUBLIC "-Wall")
@@ -113,20 +112,24 @@ if(EMSCRIPTEN)
 	# build parameters for web-ifc
 	add_executable(web-ifc ${WebIfcManager} ${WebIfcSchema} ${WebIfcParsing} ${WebIfcAPI} ${WebIfcUtility} ${WebIfcGeometry})
 	param_setter(web-ifc)
+	add_library(boolean_engine STATIC ${boolean_engine_CPP_FILES})
+	param_setter(boolean_engine)
+
+	target_link_libraries(web-ifc PRIVATE boolean_engine)
 	set_target_properties(web-ifc PROPERTIES LINK_FLAGS "${DEBUG_FLAG} --bind -flto --define-macro=REAL_T_IS_DOUBLE -s ALLOW_MEMORY_GROWTH=1 -s MAXIMUM_MEMORY=4GB -sSTACK_SIZE=5MB -s EXPORT_NAME=WebIFCWasm -s MODULARIZE=1 -s ENVIRONMENT=web")
 
 	add_executable(web-ifc-node ${WebIfcManager} ${WebIfcSchema} ${WebIfcParsing} ${WebIfcAPI} ${WebIfcUtility} ${WebIfcGeometry})
+	target_link_libraries(web-ifc-node PRIVATE boolean_engine)
 	param_setter(web-ifc-node)
 	set_target_properties(web-ifc-node PROPERTIES LINK_FLAGS "${DEBUG_FLAG} --bind -flto --define-macro=REAL_T_IS_DOUBLE -s ALLOW_MEMORY_GROWTH=1 -s MAXIMUM_MEMORY=4GB -sSTACK_SIZE=5MB -s EXPORT_NAME=WebIFCWasm -s MODULARIZE=1 ")
 
 	# multi-treaded versions
 	add_executable(web-ifc-mt ${WebIfcManager} ${WebIfcSchema} ${WebIfcParsing} ${WebIfcAPI} ${WebIfcUtility} ${WebIfcGeometry})
+	target_link_libraries(web-ifc-mt PRIVATE boolean_engine)
 	param_setter(web-ifc-mt)
 	target_compile_options(web-ifc-mt PUBLIC "-pthread")
-	
 	set_target_properties(web-ifc-mt PROPERTIES LINK_FLAGS "${DEBUG_FLAG} -pthread -s PTHREAD_POOL_SIZE=navigator.hardwareConcurrency --bind -flto --define-macro=REAL_T_IS_DOUBLE -sSTACK_SIZE=5MB -s ALLOW_MEMORY_GROWTH=1 -s MAXIMUM_MEMORY=4GB -s EXPORT_NAME=WebIFCWasm -s MODULARIZE=1 -s ENVIRONMENT=web,worker")
 	
-	target_link_libraries(web-ifc PUBLIC boolean_engine)
 	endif()
 
 if(NOT EMSCRIPTEN)
