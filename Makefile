@@ -57,12 +57,14 @@ else
 	FLAGS += -g -DDEBUG
 endif
 
-SUBDIRS			:= $(shell find $(SRC)/ -type d)
-OBJ_DIRS		:= $(patsubst $(SRC)%,$(OBJ)%,$(SUBDIRS))
-NOTFILES		:= web-ifc-wasm.cpp main.cpp *test*
-EXCLUDES		:= $(foreach F, $(NOTFILES),$(patsubst %, -not -name %,'$(F)'))
-CPPS				:= $(shell find $(SRC)/ -type f -iname *.cpp $(EXCLUDES))
-OBJS				:= $(foreach F, $(CPPS),$(call C2O,$(F)))
+NOTDIRS				:= test build_wasm_debug
+EXCLUDE_PRUNE := $(foreach D, $(NOTDIRS), -path $(SRC)/$(D) -prune -o)
+SUBDIRS				:= $(shell find $(SRC)/ -type d $(EXCLUDE_PRUNE) -print)
+OBJ_DIRS			:= $(patsubst $(SRC)%,$(OBJ)%,$(SUBDIRS))
+NOTFILES			:= web-ifc-wasm.cpp main.cpp
+EXCLUDES			:= $(foreach F, $(NOTFILES), -not -name $(F))
+CPPS					:= $(shell find $(SRC)/ $(EXCLUDE_PRUNE) -type f -iname "*.cpp" $(EXCLUDES))
+OBJS					:= $(filter %.o,$(foreach F, $(CPPS),$(call C2O,$(F))))  # Solo mantener archivos .o
 
 MKDIR				:= mkdir -p
 RMDIR				:= rm -R
