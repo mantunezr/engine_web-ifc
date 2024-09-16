@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 #include <spdlog/spdlog.h>
+#include <glm/gtx/normal.hpp>
 
 #if defined(DEBUG_DUMP_SVG) || defined(DUMP_CSG_MESHES)
 #include "../test/io_helpers.h"
@@ -15,9 +16,9 @@
 #include "operations/curve-utils.h"
 #include "operations/mesh_utils.h"
 #include "operations/boolean-utils/fuzzy-bools.h"
-
-
 #include "../../../cpp-boolean-engine/include/boolean_engine.hpp"
+
+
 #include <algorithm>
 #include <tuple>
 
@@ -1751,15 +1752,49 @@ namespace webifc::geometry
         }
         return std::tuple {points, faces};
     }
+    IfcGeometry booleanManager::convert_to_WebIfc(auto const& points) const
+    {
+        auto const num_points {points.size()};
+        auto const num_faces {num_points / 3};
+        IfcGeometry newGeom;
+		newGeom.numPoints = num_points;
+		newGeom.numFaces = num_faces;
+        newGeom.fvertexData.reserve(points.size());
+        newGeom.vertexData.reserve(points.size());
+        std::vector<fenix::boolean_engine::point_t> face_points;
+        face_points.resize(3);
+        for(size_t i {0}; i < num_points; i+=3){
+            face_points[0] = points[i + 0];
+            face_points[1] = points[i + 1];
+            face_points[2] = points[i + 2];
+            auto const normal {glm::triangleNormal(face_points[0], face_points[1], face_points[2])};
+            for(auto const& point : face_points){
+                newGeom.fvertexData.push_back(static_cast<float>(point.x));
+                newGeom.fvertexData.push_back(static_cast<float>(point.y));
+                newGeom.fvertexData.push_back(static_cast<float>(point.z));
+                newGeom.fvertexData.push_back(static_cast<float>(normal.x));
+                newGeom.fvertexData.push_back(static_cast<float>(normal.y));
+                newGeom.fvertexData.push_back(static_cast<float>(normal.z));
 
+                newGeom.vertexData.push_back(static_cast<double>(point.x));
+                newGeom.vertexData.push_back(static_cast<double>(point.y));
+                newGeom.vertexData.push_back(static_cast<double>(point.z));
+                newGeom.vertexData.push_back(static_cast<double>(normal.x));
+                newGeom.vertexData.push_back(static_cast<double>(normal.y));
+                newGeom.vertexData.push_back(static_cast<double>(normal.z));
+            }
+        }
+		newGeom.indexData.resize(num_points);
+        std::iota(newGeom.indexData.begin(), newGeom.indexData.end(), 0);
+        return newGeom;
+    }
 
     IfcGeometry booleanManager::Subtract(IfcGeometry const& firstOperator, IfcGeometry const& secondOperator)
     {
         auto [first_points, first_faces] = this->convert_to_fenix(firstOperator);
         auto [second_points, second_faces] = this->convert_to_fenix(secondOperator);
         auto const result {fenix::boolean_engine::operations::substract(first_points, first_faces, second_points, second_faces)};
-
-        return {};
+        return this->convert_to_WebIfc(result);
     }
 
 }

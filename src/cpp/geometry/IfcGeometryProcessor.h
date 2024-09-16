@@ -29,6 +29,7 @@ namespace webifc::geometry
     private:
       auto convert_to_fenix(IfcGeometry const& geometry) const;
       fuzzybools::Geometry convertToEngine(Geometry geom);
+      IfcGeometry convert_to_WebIfc(auto const& points) const;
       IfcGeometry convertToWebIfc(fuzzybools::Geometry geom);
       IfcGeometry Union(IfcGeometry firstOperator, IfcGeometry secondOperator);
       IfcGeometry Subtract_old(IfcGeometry firstOperator, IfcGeometry secondOperator);
