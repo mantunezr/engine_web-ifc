@@ -81,6 +81,10 @@ namespace webifc::geometry
 
     IfcComposedMesh IfcGeometryProcessor::GetMesh(uint32_t expressID, uint32_t nestLevel)
     {
+        //placedGeometry.geometryExpressID === 5195
+        if(expressID == 5195){
+            auto a{2};
+        }
         spdlog::debug("[GetMesh({})]",expressID);
         auto lineType = _loader.GetLineType(expressID);
 
@@ -1325,6 +1329,8 @@ namespace webifc::geometry
 
     IfcFlatMesh IfcGeometryProcessor::GetFlatMesh(uint32_t expressID)
     {
+        if(expressID == 23211)
+            auto a {2};
         spdlog::debug("[GetFlatMesh({})]",expressID);
         IfcFlatMesh flatMesh;
         flatMesh.expressID = expressID;
@@ -1754,13 +1760,14 @@ namespace webifc::geometry
     }
     IfcGeometry booleanManager::convert_to_WebIfc(auto const& points) const
     {
+        if(points.empty()) return {};
         auto const num_points {points.size()};
         auto const num_faces {num_points / 3};
         IfcGeometry newGeom;
 		newGeom.numPoints = num_points;
 		newGeom.numFaces = num_faces;
-        newGeom.fvertexData.reserve(points.size());
-        newGeom.vertexData.reserve(points.size());
+        newGeom.fvertexData.reserve(num_points * 6);
+        newGeom.vertexData.reserve(num_points * 6);
         std::vector<fenix::boolean_engine::point_t> face_points;
         face_points.resize(3);
         for(size_t i {0}; i < num_points; i+=3){
@@ -1784,7 +1791,7 @@ namespace webifc::geometry
                 newGeom.vertexData.push_back(static_cast<double>(normal.z));
             }
         }
-		newGeom.indexData.resize(num_points);
+		newGeom.indexData.resize(points.size());
         std::iota(newGeom.indexData.begin(), newGeom.indexData.end(), 0);
         return newGeom;
     }
@@ -1794,6 +1801,7 @@ namespace webifc::geometry
         auto [first_points, first_faces] = this->convert_to_fenix(firstOperator);
         auto [second_points, second_faces] = this->convert_to_fenix(secondOperator);
         auto const result {fenix::boolean_engine::operations::substract(first_points, first_faces, second_points, second_faces)};
+        //return {};
         return this->convert_to_WebIfc(result);
     }
 

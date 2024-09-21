@@ -97,6 +97,10 @@ export class IfcThree
     }
     
     private getPlacedGeometry(modelID: number, placedGeometry: PlacedGeometry) {
+        console.log({geometry: placedGeometry.geometryExpressID})
+        if(placedGeometry.geometryExpressID === 5195){
+            debugger
+        }
         const geometry = this.getBufferGeometry(modelID, placedGeometry);
         const material = this.getMeshMaterial(placedGeometry.color);
         const mesh = new THREE.Mesh(geometry, material);
@@ -153,6 +157,7 @@ export class IfcThree
         let posFloats = new Float32Array(vertexData.length / 2);
         let normFloats = new Float32Array(vertexData.length / 2);
         let colorFloats = new Float32Array(vertexData.length / 2);
+
 
         for (let i = 0; i < vertexData.length; i += 6)
         {
