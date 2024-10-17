@@ -57,7 +57,7 @@ else
 	FLAGS += -g -DDEBUG
 endif
 
-NOTDIRS				:= test build_wasm_debug
+NOTDIRS				:= test build_wasm_debug build_wasm
 EXCLUDE_PRUNE := $(foreach D, $(NOTDIRS), -path $(SRC)/$(D) -prune -o)
 SUBDIRS				:= $(shell find $(SRC)/ -type d $(EXCLUDE_PRUNE) -print)
 OBJ_DIRS			:= $(patsubst $(SRC)%,$(OBJ)%,$(SUBDIRS))
@@ -121,5 +121,9 @@ info :
 	$(info  )
 	$(info EXCLUDES FILES===================)
 	$(info $(EXCLUDES))
+	$(info =======================)
+	$(info  )
+	$(info EXCLUDES DIRECTORIES===================)
+	$(info $(EXCLUDE_PRUNE))
 	$(info =======================)
 	$(info  )

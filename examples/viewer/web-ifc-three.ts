@@ -98,9 +98,9 @@ export class IfcThree
     
     private getPlacedGeometry(modelID: number, placedGeometry: PlacedGeometry) {
         console.log({geometry: placedGeometry.geometryExpressID})
-        if(placedGeometry.geometryExpressID === 5195){
-            debugger
-        }
+        // if(placedGeometry.geometryExpressID === 5195){
+        //     debugger
+        // }
         const geometry = this.getBufferGeometry(modelID, placedGeometry);
         const material = this.getMeshMaterial(placedGeometry.color);
         const mesh = new THREE.Mesh(geometry, material);
