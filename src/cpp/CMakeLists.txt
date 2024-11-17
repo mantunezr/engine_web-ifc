@@ -88,6 +88,7 @@ function(PARAM_SETTER THE_EXECUTABLE)
 	target_include_directories(${THE_EXECUTABLE} PUBLIC ${fuzzy_SOURCE_DIR}/)
 	target_include_directories(${THE_EXECUTABLE} PUBLIC ${spdlog_SOURCE_DIR}/include)
 	target_include_directories(${THE_EXECUTABLE} PUBLIC ${boolean_engine_SOURCE_DIR}/src)
+	target_include_directories(${THE_EXECUTABLE} PUBLIC ${boolean_engine_SOURCE_DIR}/include)
 
 	if(NOT MSVC)
 		target_compile_options(${THE_EXECUTABLE} PUBLIC "-Wall")
@@ -114,17 +115,19 @@ if(EMSCRIPTEN)
 	param_setter(web-ifc)
 	add_library(boolean_engine STATIC ${boolean_engine_CPP_FILES})
 	param_setter(boolean_engine)
-
+	target_compile_definitions(web-ifc PUBLIC SPDLOG_USE_STD_FORMAT)
 	target_link_libraries(web-ifc PRIVATE boolean_engine)
 	set_target_properties(web-ifc PROPERTIES LINK_FLAGS "${DEBUG_FLAG} --bind -flto --define-macro=REAL_T_IS_DOUBLE -s ALLOW_MEMORY_GROWTH=1 -s MAXIMUM_MEMORY=4GB -sSTACK_SIZE=5MB -s EXPORT_NAME=WebIFCWasm -s MODULARIZE=1 -s ENVIRONMENT=web")
-
+	
 	add_executable(web-ifc-node ${WebIfcManager} ${WebIfcSchema} ${WebIfcParsing} ${WebIfcAPI} ${WebIfcUtility} ${WebIfcGeometry})
+	target_compile_definitions(web-ifc-node PUBLIC SPDLOG_USE_STD_FORMAT)
 	target_link_libraries(web-ifc-node PRIVATE boolean_engine)
 	param_setter(web-ifc-node)
 	set_target_properties(web-ifc-node PROPERTIES LINK_FLAGS "${DEBUG_FLAG} --bind -flto --define-macro=REAL_T_IS_DOUBLE -s ALLOW_MEMORY_GROWTH=1 -s MAXIMUM_MEMORY=4GB -sSTACK_SIZE=5MB -s EXPORT_NAME=WebIFCWasm -s MODULARIZE=1 ")
 
 	# multi-treaded versions
 	add_executable(web-ifc-mt ${WebIfcManager} ${WebIfcSchema} ${WebIfcParsing} ${WebIfcAPI} ${WebIfcUtility} ${WebIfcGeometry})
+	target_compile_definitions(web-ifc-mt PUBLIC SPDLOG_USE_STD_FORMAT)
 	target_link_libraries(web-ifc-mt PRIVATE boolean_engine)
 	target_compile_options(boolean_engine PUBLIC "-pthread" "-matomics" "-mbulk-memory")
 	param_setter(web-ifc-mt)

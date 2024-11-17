@@ -16,7 +16,7 @@
 #include "operations/curve-utils.h"
 #include "operations/mesh_utils.h"
 #include "operations/boolean-utils/fuzzy-bools.h"
-#include "../../../cpp-boolean-engine/include/boolean_engine.hpp"
+#include <boolean_engine.hpp>
 
 
 #include <algorithm>
